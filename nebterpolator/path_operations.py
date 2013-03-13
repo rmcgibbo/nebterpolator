@@ -57,3 +57,5 @@ def union_connectivity(xyzlist, atom_names):
     idihedrals = np.array(sorted(set_dihedrals, key=lambda e: sum(e)))
 
     return ibonds, iangles, idihedrals
+
+
