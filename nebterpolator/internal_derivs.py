@@ -214,8 +214,11 @@ def dihedral_derivs(xyz, idihedrals):
 
     return derivatives
 
-if __name__ == '__main__':
+def main():
     xyz = np.random.randn(10, 3)
     iangles = [[0, 1, 2], [2, 3, 4]]
 
     print angle_derivs(xyz, iangles).shape
+
+if __name__ == '__main__':
+    main()

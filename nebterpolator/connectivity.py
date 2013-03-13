@@ -36,7 +36,8 @@ def bond_connectivity(xyz, atom_names):
     Parameters
     ----------
     xyz : np.ndarray, shape=[n_atoms, 3]
-        The cartesian coordinates of a SINGLE frame.
+        The cartesian coordinates of a single conformation. The coodinates
+        are expected to be in units of nanometers.
     atom_names : array_like of strings, length=n_atoms
         A list of the names of each of the atoms, which will be used for
         grabbing the covalent radii.
@@ -101,8 +102,8 @@ def angle_connectivity(ibonds):
     Parameters
     ----------
     ibonds : np.ndarray, shape=[n_bonds, 2], dtype=int
-        n_bonds x 2 array of indices, where each row is the index of two
-        atom who participate in a bond.
+        Each row in `ibonds` is a pair of indicies `i`, `j`, indicating that
+        atoms `i` and `j` are bonded
 
     Returns
     -------
@@ -112,10 +113,9 @@ def angle_connectivity(ibonds):
     """
 
     graph = nx.from_edgelist(ibonds)
-    n_atoms = graph.number_of_nodes()
     iangles = []
 
-    for i in xrange(n_atoms):
+    for i in graph.nodes():
         for (m, n) in combinations(graph.neighbors(i), 2):
             # so now the there is a bond angle m-i-n
             iangles.append((m, i, n))
@@ -134,8 +134,8 @@ def dihedral_connectivity(ibonds):
     Parameters
     ----------
     ibonds : np.ndarray, shape=[n_bonds, 2], dtype=int
-        n_bonds x 2 array of indices, where each row is the index of two
-        atom who participate in a bond.
+        Each row in `ibonds` is a pair of indicies `i`, `j`, indicating that
+        atoms `i` and `j` are bonded
 
     Returns
     -------
@@ -144,7 +144,6 @@ def dihedral_connectivity(ibonds):
         bonded to `j`, `j` is bonded to `k`, and `k` is bonded to `l`.
     """
     graph = nx.from_edgelist(ibonds)
-    n_atoms = graph.number_of_nodes()
     idihedrals = []
 
     # TODO: CHECK FOR DIHEDRAL ANGLES THAT ARE 180 and recover
@@ -152,8 +151,8 @@ def dihedral_connectivity(ibonds):
     #    An msmbuilder trajectory, only the first frame will be used. This
     #    is used purely to make the check for angle(ABC) != 180.
 
-    for a in xrange(n_atoms):
-        for b in graph.neighbors(a):
+    for a in graph.nodes():
+        for b in graph.neighbors(a):                
             for c in ifilter(lambda c: c not in [a, b], graph.neighbors(b)):
                 for d in ifilter(lambda d: d not in [a, b, c], graph.neighbors(c)):
                     idihedrals.append((a, b, c, d))

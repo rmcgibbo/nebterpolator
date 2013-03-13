@@ -17,7 +17,7 @@ import numpy as np
 ##############################################################################
 
 
-def distances(xyzlist, ibonds):
+def bonds(xyzlist, ibonds):
     """Calculate a set of bond lengths, for each frame in a trajectory
 
     Parameters
@@ -31,7 +31,7 @@ def distances(xyzlist, ibonds):
 
     Returns
     -------
-    distances : np.ndarray, shape=[n_frames, n_bonds]
+    bonds : np.ndarray, shape=[n_frames, n_bonds]
         The collected distances, such that distances[i,j] is the distance
         between the jth pair of atoms (whose indices are ibonds[j,0] and
         ibonds[j,1]) in the `i`th frame of the trajectory
@@ -173,13 +173,16 @@ def dihedrals(xyzlist, idihedrals):
     return np.arctan2(arg1, arg2)
 
 
-if __name__ == '__main__':
+def main():
     xyzlist = [[[0, 0, 0], [0, 0, 1], [0, 1, 1], [1, 1, 1]]]
     ibonds = [[0, 1], [2, 3]]
-    print distances(xyzlist, ibonds)
+    print bonds(xyzlist, ibonds)
 
     iangles = [[0, 1, 2], [1, 2, 3]]
     print angles(xyzlist, iangles)
 
     idihedrals = [[0, 1, 2, 3]]
     print dihedrals(xyzlist, idihedrals)
+
+if __name__ == '__main__':
+    main()
