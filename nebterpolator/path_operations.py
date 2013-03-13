@@ -1,3 +1,5 @@
+"""Higher-level methods for manipulating trajectories
+"""
 
 ##############################################################################
 # Imports

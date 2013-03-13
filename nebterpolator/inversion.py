@@ -1,4 +1,4 @@
-"""Methods for interpolating a smooth path in internal coordinates.
+"""Determine cartesian coordinates from internal coordinates
 """
 
 ##############################################################################
