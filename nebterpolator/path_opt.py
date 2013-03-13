@@ -63,8 +63,8 @@ def path_all_connectivity(xyzlist, atom_names):
     return ibonds, iangles, idihedrals
 
 
-def to_cartesian(bonds, ibonds, angles, iangles, dihedrals, idihedrals,
-                 cartesian_guess, **kwargs):
+def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
+                            idihedrals, cartesian_guess, **kwargs):
     """Determine a set of cartesian coordinates maximally-consistent with
     a set of redundant internal coordinates.
 
@@ -204,8 +204,8 @@ def main():
     angles = internal.angles(xyzlist, iangles)
     dihedrals = internal.dihedrals(xyzlist, idihedrals)
 
-    x = to_cartesian(bonds[0], ibonds, angles[0], iangles, dihedrals[0],
-                     idihedrals, xyzlist[1], m=20)
+    x = least_squares_cartesian(bonds[0], ibonds, angles[0], iangles,
+                                dihedrals[0], idihedrals, xyzlist[1], m=20)
 
     print x
     print xyzlist[0]
