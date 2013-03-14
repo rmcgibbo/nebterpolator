@@ -58,4 +58,8 @@ def union_connectivity(xyzlist, atom_names):
 
     return ibonds, iangles, idihedrals
 
-
+#def polynomial_smooth(y, x, order=2):
+#
+#    def objective(coeffs):
+#        y -
+#y_pred = np.polyval(coeffs, x)
