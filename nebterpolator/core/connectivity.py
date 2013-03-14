@@ -20,7 +20,7 @@ from itertools import combinations, ifilter
 # http://pubs.rsc.org/en/Content/ArticleLanding/2008/DT/b801115j
 COVALENT_RADII = {'C': 0.0762, 'N': 0.0706, 'O': 0.0661, 'H': 0.031,
                   'S': 0.105}
-              
+
 __all__ = ['bond_connectivity', 'angle_connectivity', 'dihedral_connectivity']
 
 ##############################################################################
@@ -154,7 +154,7 @@ def dihedral_connectivity(ibonds):
     #    is used purely to make the check for angle(ABC) != 180.
 
     for a in graph.nodes():
-        for b in graph.neighbors(a):                
+        for b in graph.neighbors(a):
             for c in ifilter(lambda c: c not in [a, b], graph.neighbors(b)):
                 for d in ifilter(lambda d: d not in [a, b, c], graph.neighbors(c)):
                     idihedrals.append((a, b, c, d))
