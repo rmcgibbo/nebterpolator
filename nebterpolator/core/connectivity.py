@@ -20,6 +20,8 @@ from itertools import combinations, ifilter
 # http://pubs.rsc.org/en/Content/ArticleLanding/2008/DT/b801115j
 COVALENT_RADII = {'C': 0.0762, 'N': 0.0706, 'O': 0.0661, 'H': 0.031,
                   'S': 0.105}
+              
+__all__ = ['bond_connectivity', 'angle_connectivity', 'dihedral_connectivity']
 
 ##############################################################################
 # Functions

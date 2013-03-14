@@ -9,7 +9,7 @@
 import numpy as np
 
 # local imports
-from core import connectivity
+import core
 
 ##############################################################################
 # Globals
@@ -21,6 +21,9 @@ __all__ = ['union_connectivity']
 # Functions
 ##############################################################################
 
+
+def smooth_trajectory():
+    pass
 
 def union_connectivity(xyzlist, atom_names):
     """Get the union of all possible proper bonds/angles/dihedrals
@@ -48,9 +51,9 @@ def union_connectivity(xyzlist, atom_names):
     set_dihedrals = set()
 
     for xyz in xyzlist:
-        bonds = connectivity.bond_connectivity(xyz, atom_names)
-        angles = connectivity.angle_connectivity(bonds)
-        dihedrals = connectivity.dihedral_connectivity(bonds)
+        bonds = core.bond_connectivity(xyz, atom_names)
+        angles = core.angle_connectivity(bonds)
+        dihedrals = core.dihedral_connectivity(bonds)
 
         set_bonds.update(set([tuple(e) for e in bonds]))
         set_angles.update(set([tuple(e) for e in angles]))

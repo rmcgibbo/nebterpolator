@@ -10,8 +10,7 @@ import numpy as np
 from scipy.optimize import leastsq
 
 # local imports
-from core import internal
-from core import internal_derivs
+import core
 
 ##############################################################################
 # Globals
@@ -135,9 +134,9 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
         # these methods require 3d input
         xyzlist = np.array([xyz])
-        bonds = internal.bonds(xyzlist, ibonds)
-        angles = internal.angles(xyzlist, iangles)
-        dihedrals = internal.dihedrals(xyzlist, idihedrals)
+        bonds = core.bonds(xyzlist, ibonds)
+        angles = core.angles(xyzlist, iangles)
+        dihedrals = core.dihedrals(xyzlist, idihedrals)
 
         # the internal coordinates corresponding to the current cartesian
         # 1-dimensional, of length n_internal
@@ -152,9 +151,9 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     def grad(x):
         xyz = independent_vars_to_xyz(x)
 
-        d_bonds = internal_derivs.bond_derivs(xyz, ibonds)
-        d_angles = internal_derivs.angle_derivs(xyz, iangles)
-        d_dihedrals = internal_derivs.dihedral_derivs(xyz, idihedrals)
+        d_bonds = core.bond_derivs(xyz, ibonds)
+        d_angles = core.angle_derivs(xyz, iangles)
+        d_dihedrals = core.dihedral_derivs(xyz, idihedrals)
 
         # the derivatives of the internal coordinates wrt the cartesian
         # this is 2d, with shape equal to n_internal x n_cartesian
@@ -192,9 +191,9 @@ def main():
 
     ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
 
-    bonds = internal.bonds(xyzlist, ibonds)
-    angles = internal.angles(xyzlist, iangles)
-    dihedrals = internal.dihedrals(xyzlist, idihedrals)
+    bonds = core.bonds(xyzlist, ibonds)
+    angles = core.angles(xyzlist, iangles)
+    dihedrals = core.dihedrals(xyzlist, idihedrals)
 
     xyz_guess = xyzlist[0] + 0.025*np.random.rand(*xyzlist[0].shape)
     x = least_squares_cartesian(bonds[0], ibonds, angles[0], iangles,
