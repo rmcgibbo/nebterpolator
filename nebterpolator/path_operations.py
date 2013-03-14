@@ -10,6 +10,7 @@ import numpy as np
 
 # local imports
 import core
+from align import progressive_align
 from smoothing import filtfit_smooth
 from inversion import least_squares_cartesian
 
@@ -26,7 +27,10 @@ DEBUG = True
 
 
 def smooth_path(xyzlist, atom_names, width, **kwargs):
-    """
+    """Smooth a trajectory by transforming to redundant, internal coordinates,
+    running a 1d timeseries smoothing algorithm on each DOF, and then
+    reconstructing a set of consistent cartesian coordinates.
+    
     TODO: write this function as a iterator that yields s_xyz, so that
     they can be saved to disk (async) immediately when they're produced.
     
@@ -87,9 +91,15 @@ def smooth_path(xyzlist, atom_names, width, **kwargs):
         s_xyzlist[i] = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i],
                                 iangles, s_dihedrals[i], idihedrals, xyz,
                                 display=True)
-    return s_xyzlist
+    return progressive_align(s_xyzlist)
 
 def plot_smoothing(bonds, s_bonds, angles, s_angles, dihedrals, s_dihedrals):
+    """
+    Debuggin method to plot a few random bond/angle/dihedral timeseries.
+    This can use used to figure out what smoothing width is appropriate for
+    your dataset.
+    
+    """
     import matplotlib.pyplot as pp
     
     pp.subplot(3,1,1)

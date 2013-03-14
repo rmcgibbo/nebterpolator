@@ -27,7 +27,7 @@ def main():
     # angstroms to nm
     xyzlist *= nm_in_angstrom
     
-    s_xyzlist = smooth_path(xyzlist, atom_names, width=50,
+    s_xyzlist = smooth_path(xyzlist, atom_names, width=75,
                             dihedral_width=2.0)
     
     try:
