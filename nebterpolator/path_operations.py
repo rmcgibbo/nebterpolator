@@ -12,8 +12,15 @@ import numpy as np
 from core import connectivity
 
 ##############################################################################
+# Globals
+##############################################################################
+
+__all__ = ['union_connectivity']
+
+##############################################################################
 # Functions
 ##############################################################################
+
 
 def union_connectivity(xyzlist, atom_names):
     """Get the union of all possible proper bonds/angles/dihedrals
@@ -57,9 +64,3 @@ def union_connectivity(xyzlist, atom_names):
     idihedrals = np.array(sorted(set_dihedrals, key=lambda e: sum(e)))
 
     return ibonds, iangles, idihedrals
-
-#def polynomial_smooth(y, x, order=2):
-#
-#    def objective(coeffs):
-#        y -
-#y_pred = np.polyval(coeffs, x)
