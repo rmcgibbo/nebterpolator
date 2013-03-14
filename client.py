@@ -4,6 +4,7 @@
 
 from nebterpolator.io import XYZFile
 from nebterpolator.path_operations import smooth_path
+from nebterpolator.alignment import progressive_align
 
 ##############################################################################
 # Globals
@@ -35,7 +36,7 @@ def main():
         f.write_trajectory(s_xyzlist / nm_in_angstrom, atom_names)
     finally:
         f.close()
-    
-    
+
+
 if __name__ == '__main__':
     main()
