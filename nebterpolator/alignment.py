@@ -19,20 +19,33 @@ def progressive_align(xyzlist):
 
     centroids = np.mean(xyzlist, axis=1)
     
+    # for i in range(len(xyzlist)):
+    #     xyzlist[i] -= centroids[i]
+    
     # center the conformations
     c_xyzlist = xyzlist - centroids[:, np.newaxis, :]
     
     for i in range(1, len(xyzlist)):
-        A = np.dot(c_xyzlist[i].T, c_xyzlist[i-1])  # covariance
-        v, s, w = np.linalg.svd(A)
+        A = np.dot(c_xyzlist[i].T, c_xyzlist[i-1])
+        v, s, wt = np.linalg.svd(A)
 
-        # do we need to flip our coord system?
-        d = np.linalg.det(np.dot(w, v.T))
-        m = np.eye(3,3)
-        m[d,d] = d
-        
-        rotation_matrix = np.dot(np.dot(w, m), v.T)
+        # # do we need to flip our coord system?
+        if  np.linalg.det(wt) * np.linalg.det(v) < 0:
+            s[-1] *= -1
+            v[:, -1] *= -1
 
-        c_xyzlist[i] = np.dot(c_xyzlist[i], rotation_matrix.T)
+        rotation_matrix = np.dot(v, wt)
+
+        c_xyzlist[i] = np.dot(c_xyzlist[i], rotation_matrix)
+        print np.linalg.norm(c_xyzlist[i] - c_xyzlist[i-1])
     
-    return c_xyzlist
+    return xyzlist
+
+# def main():
+#     from io import XYZFile
+#     xyzlist, _ = XYZFile('../reaction_015.xyz').read_trajectory()
+#     progressive_align(xyzlist)
+#     XYZFile('../reaction_015.align.xyz', 'w').write_trajectory(xyzlist, _)
+#     
+# if __name__ == '__main__':
+#     main()
