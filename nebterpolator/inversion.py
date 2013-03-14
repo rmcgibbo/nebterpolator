@@ -7,7 +7,7 @@
 
 # library imports
 import numpy as np
-from scipy.optimize import root
+from scipy.optimize import leastsq
 
 # local imports
 from core import internal
@@ -17,8 +17,9 @@ from core import internal_derivs
 # Functions
 ##############################################################################
 
+
 def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
-                            idihedrals, cartesian_guess, **kwargs):
+                            idihedrals, xyz_guess, **kwargs):
     """Determine a set of cartesian coordinates maximally-consistent with
     a set of redundant internal coordinates.
 
@@ -55,7 +56,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         Each row in `idihedrals` is a quartet of indicies `i`, `j`, `k`, `l`,
         indicating that atoms `i` - `j` - `k` - `l` form a dihedral of
         interest.
-    cartesian_guess : np.ndarray, shape[n_atoms, 3]
+    xyz_guess : np.ndarray, shape[n_atoms, 3]
         A guess for the cartesian coordinates. This will serve as a starting
         point for the optimization.
 
@@ -66,15 +67,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         slower, but may be useful for debugging.
     display : bool, default=True
         Display summary statistics from the L-BFGS-B optimizer to stdout
-    m : int, default=20
-        The maximum number of variable metric corrections used to define the
-        limited memory matrix. (The limited memory BFGS method does not store
-        the full hessian but uses this many terms in an approximation to it.)
     """
-
-    # TODO: Remove 6 degrees of freedom from the cartesian optimization, to
-    # exploit the fact that we already KNOW that there is this 6 dimensional
-    # manifold on which the objective function is constant.
 
     # TODO: expose the ability to set a weight vector over the different
     # internal coordinates that sets how they contribute to the objective
@@ -83,11 +76,12 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # dihedrals than bonds and angles, and the bond lengths are measured in
     # different units than the angles and dihedrals.
 
-    approx_grad = kwargs.pop('approx_grad', False)
     display = kwargs.pop('display', True)
-    m = kwargs.pop('m', 20)
+    approx_grad = kwargs.pop('approx_grad', False)
+    for key in kwargs.keys():
+        print '%s is not a recognized kwarg. ignored' % key
 
-    if cartesian_guess.ndim != 2:
+    if xyz_guess.ndim != 2:
         raise ValueError('cartesian_guess should be a 2d array')
     if len(bonds) != len(ibonds):
         raise ValueError('The size of bonds and ibonds doesn\'t match')
@@ -96,63 +90,97 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     if len(dihedrals) != len(idihedrals):
         raise ValueError('The size of dihedrals and idihedrals doesn\'t match')
 
-    cartesian_shape = cartesian_guess.shape
+    n_atoms = xyz_guess.shape[0]
     reference_internal = np.concatenate([bonds, angles, dihedrals])
 
-    def func(flat_cartesian):
-        if flat_cartesian.ndim != 1:
-            raise TypeError('objective takes flattened cartesian coordinates')
+    def independent_vars_to_xyz(x):
+        if x.ndim != 1:
+            raise TypeError('independent variables must be 1d')
+        if len(x) != 3*n_atoms - 6:
+            raise TypeError('Must be 3N-6 independent variables')
 
-        x = flat_cartesian.reshape(cartesian_shape)
+        xyz = np.zeros((n_atoms, 3))
 
-        bonds = internal.bonds([x], ibonds)
-        angles = internal.angles([x], iangles)
-        dihedrals = internal.dihedrals([x], idihedrals)
+        # fill in 6 DOFs from the initial structure
+        xyz[0, :] = xyz_guess[0, :]
+        xyz[1, 0:2] = xyz_guess[1, 0:2]
+        xyz[2, 0] = xyz_guess[2, 0]
+
+        # the rest are independent variables
+        xyz[1, 2] = x[0]
+        xyz[2, 1] = x[1]
+        xyz[2, 2] = x[2]
+        xyz[3:, :] = x[3:].reshape(n_atoms-3, 3)
+
+        return xyz
+
+    def xyz_to_independent_vars(xyz):
+        special_indices = [5, 7, 8]
+
+        x = np.zeros(3*n_atoms - 6)
+        flat = xyz.flatten()
+        x[0:3] = flat[special_indices]
+        x[3:] = flat[9:]
+
+        return x
+
+    def func(x):
+        xyz = independent_vars_to_xyz(x)
+
+        # these methods require 3d input
+        xyzlist = np.array([xyz])
+        bonds = internal.bonds(xyzlist, ibonds)
+        angles = internal.angles(xyzlist, iangles)
+        dihedrals = internal.dihedrals(xyzlist, idihedrals)
 
         # the internal coordinates corresponding to the current cartesian
         # 1-dimensional, of length n_internal
         current_internal = np.concatenate([bonds.flatten(), angles.flatten(),
                                            dihedrals.flatten()])
-        # error = 0.5 * np.sum((current_internal - reference_internal)**2)
-        # 
-        # if approx_grad:
-        #     # if we're using the approx_grad, we don't want to actually return
-        #     # the grads
-        #     return error
+        result = current_internal - reference_internal
 
-        d_bonds = internal_derivs.bond_derivs(x, ibonds)
-        d_angles = internal_derivs.angle_derivs(x, iangles)
-        d_dihedrals = internal_derivs.dihedral_derivs(x, idihedrals)
+        if display:
+            print 'SSD:', np.sum(np.square(result))
+        return result
+
+    def grad(x):
+        xyz = independent_vars_to_xyz(x)
+
+        d_bonds = internal_derivs.bond_derivs(xyz, ibonds)
+        d_angles = internal_derivs.angle_derivs(xyz, iangles)
+        d_dihedrals = internal_derivs.dihedral_derivs(xyz, idihedrals)
 
         # the derivatives of the internal coordinates wrt the cartesian
         # this is 2d, with shape equal to n_internal x n_cartesian
         d_internal = np.vstack([d_bonds.reshape((len(ibonds), -1)),
                                 d_angles.reshape((len(iangles), -1)),
                                 d_dihedrals.reshape((len(idihedrals), -1))])
+        return d_internal
 
-        # grad_error = np.dot((current_internal - reference_internal),
-        #                     d_internal)
-        # 
-        # return error, grad_error
-        return current_internal, d_internal
+    x0 = xyz_to_independent_vars(xyz_guess)
+    # make sure that we're extracting and reconstructing
+    # the 3N-6 correctly
+    np.testing.assert_equal(independent_vars_to_xyz(x0), xyz_guess)
 
-    root(func, x0=cartesian_guess.flatten(), jac=True, method='lm')
+    if approx_grad:
+        print 'approx grad'
+        x, cov_x, info, msg, iflag = leastsq(func, full_output=True, x0=x0)
+    else:
+        x, cov_x, info, msg, iflag = leastsq(func, col_deriv=grad,
+                                             full_output=True, x0=x0, ftol=1e-10)
 
-    #iprint = 0 if display else -1
-    #x, f, d = fmin_l_bfgs_b(objective, cartesian_guess.flatten(),
-    #                        iprint=iprint, approx_grad=approx_grad, m=m)
-
-    #final_cartesian = x.reshape(cartesian_shape)
-
-    #if d['warnflag'] != 0:
-    #    raise ValueError('The optimization did not converge.')
-
-    return final_cartesian
+    xyz_final = independent_vars_to_xyz(x)
+    if display:
+        print 'FINAL SSD:', np.sum(np.square(info['fvec']))
+    if not iflag in [1, 2, 3, 4]:
+        # these are the sucess values if the flag
+        raise Exception(msg)
+    return xyz_final
 
 
 def main():
     from path_operations import union_connectivity
-    np.random.seed(10)
+    #np.random.seed(42)
     xyzlist = 0.1*np.random.randn(7, 5, 3)
     atom_names = ['C' for i in range(5)]
 
@@ -162,11 +190,12 @@ def main():
     angles = internal.angles(xyzlist, iangles)
     dihedrals = internal.dihedrals(xyzlist, idihedrals)
 
+    xyz_guess = xyzlist[0] + 0.025*np.random.rand(*xyzlist[0].shape)
     x = least_squares_cartesian(bonds[0], ibonds, angles[0], iangles,
-                                dihedrals[0], idihedrals, xyzlist[1], m=20)
+                                dihedrals[0], idihedrals, xyz_guess)
 
     print x
-    print xyzlist[0]
+    #print xyzlist[0]
 
 if __name__ == '__main__':
     main()
