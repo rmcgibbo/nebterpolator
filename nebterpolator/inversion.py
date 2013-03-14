@@ -144,8 +144,8 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
                                            dihedrals.flatten()])
         result = current_internal - reference_internal
 
-        if display:
-            print 'SSD:', np.sum(np.square(result))
+        #if display:
+        #    print 'SSD:', np.sum(np.square(result))
         return result
 
     def grad(x):

@@ -131,6 +131,9 @@ def filtfit_smooth(signal, width=11, order=3):
     output : np.ndarray, ndim=1
         The smoothed signal
     """
+    width = float(width)
+    if width < 2.0:
+        raise ValueError('Width must be greater than or equal to 2')
 
     # first pad the signal on the ends
     pad = int(np.ceil((width + 1)/2)*2 - 1)  # nearest odd integer

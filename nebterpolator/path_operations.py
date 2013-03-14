@@ -10,20 +10,115 @@ import numpy as np
 
 # local imports
 import core
+from smoothing import filtfit_smooth
+from inversion import least_squares_cartesian
 
 ##############################################################################
 # Globals
 ##############################################################################
 
-__all__ = ['union_connectivity']
+__all__ = ['smooth_trajectory', 'union_connectivity']
+DEBUG = True
 
 ##############################################################################
 # Functions
 ##############################################################################
 
 
-def smooth_trajectory():
-    pass
+def smooth_path(xyzlist, atom_names, width, **kwargs):
+    """
+    TODO: write this function as a iterator that yields s_xyz, so that
+    they can be saved to disk (async) immediately when they're produced.
+    
+    Parameters
+    ----------
+    xyzlist : np.ndarray
+        Cartesian coordinates
+    atom_names : array_like of strings
+        The names of the atoms. Required for determing connectivity.
+    width : float
+        Width for the smoothing kernels
+    
+    Other Parameters
+    ----------------
+    bond_width : float
+        Override width just for the bond terms
+    angle_width : float
+        Override width just for the angle terms
+    dihedral_width : float
+        Override width just for the dihedral terms
+        
+    Returns
+    -------
+    smoothed_xyzlist : np.ndarray
+    """
+    
+    bond_width = kwargs.pop('bond_width', width)
+    angle_width = kwargs.pop('angle_width', width)
+    dihedral_width = kwargs.pop('dihedral_width', width)
+    for key in kwargs.keys():
+        print ('WARNING: Ignoring key "%s" in kwarg. '
+               'It wasn\'t recognized.' % key)
+    
+    ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
+
+    # get the internal coordinates in each frame
+    bonds = core.bonds(xyzlist, ibonds)
+    angles = core.angles(xyzlist, iangles)
+    dihedrals = core.dihedrals(xyzlist, idihedrals)
+    
+    
+    # smooth the timeseries of internal coordinates
+    s_bonds = np.zeros_like(bonds)
+    s_angles = np.zeros_like(angles)
+    s_dihedrals = np.zeros_like(dihedrals)
+    for i in xrange(bonds.shape[1]):
+        s_bonds[:, i] = filtfit_smooth(bonds[:, i], width=bond_width)
+    for i in xrange(angles.shape[1]):
+        s_angles[:, i] = filtfit_smooth(angles[:, i], width=angle_width)
+    for i in xrange(dihedrals.shape[1]):
+        s_dihedrals[:, i] = filtfit_smooth(dihedrals[:, i], width=dihedral_width)
+    
+    
+    # reconstruct the cartesian coordinates
+    s_xyzlist = np.zeros_like(xyzlist)
+    for i, xyz in enumerate(xyzlist):
+        print 'reconstructing frame %d of %d' % (i, len(xyzlist))
+        s_xyzlist[i] = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i],
+                                iangles, s_dihedrals[i], idihedrals, xyz,
+                                display=True)
+    return s_xyzlist
+
+def plot_smoothing(bonds, s_bonds, angles, s_angles, dihedrals, s_dihedrals):
+    import matplotlib.pyplot as pp
+    
+    pp.subplot(3,1,1)
+    bond_i = np.random.randint(len(bonds[0]))
+    pp.title("Bond %d over timeseries" % bond_i)
+    pp.plot(s_bonds[:, bond_i], label='smoothed')
+    pp.plot(bonds[:, bond_i], label='raw data')
+    pp.xlabel('Time')
+    pp.ylabel('Bond %d' % bond_i)
+    
+    pp.subplot(3,1,2)
+    angle_i = np.random.randint(len(angles[0]))
+    pp.title("Angle %d over timeseries" % angle_i)
+    pp.plot(s_angles[:, angle_i], label='smoothed')
+    pp.plot(angles[:, angle_i], label='raw data')
+    pp.xlabel('Time')
+    pp.ylabel('Angle %d' % bond_i)
+    
+    pp.subplot(3,1,3)
+    dihedral_i = np.random.randint(len(dihedrals[0]))
+    pp.title("Dihedral %d over timeseries" % dihedral_i)
+    pp.plot(s_dihedrals[:, dihedral_i], label='smoothed')
+    pp.plot(dihedrals[:, dihedral_i], label='raw data')
+    pp.xlabel('Time')
+    pp.ylabel('Dihedral %d' % dihedral_i)
+    
+    pp.subplots_adjust(hspace=0.5)
+    pp.show()
+        
 
 def union_connectivity(xyzlist, atom_names):
     """Get the union of all possible proper bonds/angles/dihedrals
