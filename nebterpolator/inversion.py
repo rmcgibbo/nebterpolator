@@ -7,7 +7,7 @@
 
 # library imports
 import numpy as np
-from scipy.optimize import fmin_l_bfgs_b
+from scipy.optimize import root
 
 # local imports
 from core import internal
@@ -99,7 +99,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     cartesian_shape = cartesian_guess.shape
     reference_internal = np.concatenate([bonds, angles, dihedrals])
 
-    def objective(flat_cartesian):
+    def func(flat_cartesian):
         if flat_cartesian.ndim != 1:
             raise TypeError('objective takes flattened cartesian coordinates')
 
@@ -113,12 +113,12 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         # 1-dimensional, of length n_internal
         current_internal = np.concatenate([bonds.flatten(), angles.flatten(),
                                            dihedrals.flatten()])
-        error = 0.5 * np.sum((current_internal - reference_internal)**2)
-
-        if approx_grad:
-            # if we're using the approx_grad, we don't want to actually return
-            # the grads
-            return error
+        # error = 0.5 * np.sum((current_internal - reference_internal)**2)
+        # 
+        # if approx_grad:
+        #     # if we're using the approx_grad, we don't want to actually return
+        #     # the grads
+        #     return error
 
         d_bonds = internal_derivs.bond_derivs(x, ibonds)
         d_angles = internal_derivs.angle_derivs(x, iangles)
@@ -130,19 +130,22 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
                                 d_angles.reshape((len(iangles), -1)),
                                 d_dihedrals.reshape((len(idihedrals), -1))])
 
-        grad_error = np.dot((current_internal - reference_internal),
-                            d_internal)
+        # grad_error = np.dot((current_internal - reference_internal),
+        #                     d_internal)
+        # 
+        # return error, grad_error
+        return current_internal, d_internal
 
-        return error, grad_error
+    root(func, x0=cartesian_guess.flatten(), jac=True, method='lm')
 
-    iprint = 0 if display else -1
-    x, f, d = fmin_l_bfgs_b(objective, cartesian_guess.flatten(),
-                            iprint=iprint, approx_grad=approx_grad, m=m)
+    #iprint = 0 if display else -1
+    #x, f, d = fmin_l_bfgs_b(objective, cartesian_guess.flatten(),
+    #                        iprint=iprint, approx_grad=approx_grad, m=m)
 
-    final_cartesian = x.reshape(cartesian_shape)
+    #final_cartesian = x.reshape(cartesian_shape)
 
-    if d['warnflag'] != 0:
-        raise ValueError('The optimization did not converge.')
+    #if d['warnflag'] != 0:
+    #    raise ValueError('The optimization did not converge.')
 
     return final_cartesian
 
