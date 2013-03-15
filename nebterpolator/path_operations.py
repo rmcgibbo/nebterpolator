@@ -7,11 +7,17 @@
 
 # library imports
 import numpy as np
+import itertools
+try:
+    from mpi4py import MPI
+    HAVE_MPI = True
+except ImportError:
+    HAVE_MPI = False
 
 # local imports
 import core
-from align import progressive_align
-from smoothing import filtfit_smooth
+from alignment import progressive_align
+from smoothing import filtfit_smooth, angular_smooth
 from inversion import least_squares_cartesian
 
 ##############################################################################
@@ -21,10 +27,27 @@ from inversion import least_squares_cartesian
 __all__ = ['smooth_trajectory', 'union_connectivity']
 DEBUG = True
 
+if HAVE_MPI:
+    COMM = MPI.COMM_WORLD
+    RANK = COMM.Get_rank()
+    SIZE = COMM.Get_size()
+    HAVE_MPI = (SIZE > 1)
+
 ##############################################################################
 # Functions
 ##############################################################################
 
+def group(iterable, n_groups):
+    return [iterable[i::n_groups] for i in range(n_groups)]
+
+def interweave(list_of_arrays):
+    first_dimension = sum(len(e) for e in list_of_arrays)
+    output_shape = (first_dimension,) + list_of_arrays[0].shape[1:]
+
+    output = np.empty(output_shape, dtype=list_of_arrays[0].dtype)
+    for i in range(SIZE):
+        output[i::SIZE] = list_of_arrays[i]
+    return output
 
 def smooth_path(xyzlist, atom_names, width, **kwargs):
     """Smooth a trajectory by transforming to redundant, internal coordinates,
@@ -57,41 +80,85 @@ def smooth_path(xyzlist, atom_names, width, **kwargs):
     smoothed_xyzlist : np.ndarray
     """
     
-    bond_width = kwargs.pop('bond_width', width)
-    angle_width = kwargs.pop('angle_width', width)
-    dihedral_width = kwargs.pop('dihedral_width', width)
-    for key in kwargs.keys():
-        print ('WARNING: Ignoring key "%s" in kwarg. '
-               'It wasn\'t recognized.' % key)
-    
-    ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
+    if (not HAVE_MPI) or (HAVE_MPI and RANK == 0):
+        bond_width = kwargs.pop('bond_width', width)
+        angle_width = kwargs.pop('angle_width', width)
+        dihedral_width = kwargs.pop('dihedral_width', width)
+        dihedral_fraction = kwargs.pop('dihedral_fraction', False)
+        for key in kwargs.keys():
+            print ('WARNING: Ignoring key "%s" in kwarg. '
+                   'It wasn\'t recognized.' % key)
 
-    # get the internal coordinates in each frame
-    bonds = core.bonds(xyzlist, ibonds)
-    angles = core.angles(xyzlist, iangles)
-    dihedrals = core.dihedrals(xyzlist, idihedrals)
+        ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
+        print 'TOTAL OF %d bonds' % len(ibonds)
+        print '%d angles' % len(iangles)
+        print '%d dihedrals' % len(idihedrals)
+        
+        # get the internal coordinates in each frame
+        bonds = core.bonds(xyzlist, ibonds)
+        angles = core.angles(xyzlist, iangles)
+        dihedrals = core.dihedrals(xyzlist, idihedrals)
+
+        # smooth the timeseries of internal coordinates (start with s)
+        s_bonds = np.zeros_like(bonds)
+        s_angles = np.zeros_like(angles)
+        s_dihedrals = np.zeros_like(dihedrals)
+        for i in xrange(bonds.shape[1]):
+            s_bonds[:, i] = filtfit_smooth(bonds[:, i], width=bond_width)
+        for i in xrange(angles.shape[1]):
+            s_angles[:, i] = filtfit_smooth(angles[:, i], width=angle_width)
+        for i in xrange(dihedrals.shape[1]):
+            s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
+                            smoothing_func=filtfit_smooth, width=dihedral_width)
+        
     
-    
-    # smooth the timeseries of internal coordinates
-    s_bonds = np.zeros_like(bonds)
-    s_angles = np.zeros_like(angles)
-    s_dihedrals = np.zeros_like(dihedrals)
-    for i in xrange(bonds.shape[1]):
-        s_bonds[:, i] = filtfit_smooth(bonds[:, i], width=bond_width)
-    for i in xrange(angles.shape[1]):
-        s_angles[:, i] = filtfit_smooth(angles[:, i], width=angle_width)
-    for i in xrange(dihedrals.shape[1]):
-        s_dihedrals[:, i] = filtfit_smooth(dihedrals[:, i], width=dihedral_width)
-    
+        #if DEBUG:
+        #    for i in range(10):
+        #        plot_smoothing(bonds, s_bonds, angles, s_angles, dihedrals, s_dihedrals)
     
     # reconstruct the cartesian coordinates
-    s_xyzlist = np.zeros_like(xyzlist)
-    for i, xyz in enumerate(xyzlist):
-        print 'reconstructing frame %d of %d' % (i, len(xyzlist))
-        s_xyzlist[i] = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i],
-                                iangles, s_dihedrals[i], idihedrals, xyz,
-                                display=True)
-    return progressive_align(s_xyzlist)
+    if not HAVE_MPI:
+        s_xyzlist = np.zeros_like(xyzlist)
+        errors = np.zeros(len(xyzlist))
+        for i, xyz_guess in enumerate(xyzlist):
+            print 'reconstructing frame %d of %d' % (i, len(xyzlist))
+            s_xyzlist[i], errors[i] = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i],
+                                            iangles, s_dihedrals[i], idihedrals, xyz_guess, display=True)
+    else:
+        if RANK == 0:
+           xyzlist = np.array(group(xyzlist, SIZE))
+           s_bonds = np.array(group(s_bonds, SIZE))
+           s_angles = np.array(group(s_angles, SIZE))
+           s_dihedrals = np.array(group(s_dihedrals, SIZE))
+        else:
+           xyzlist, s_bonds, s_angles, s_dihedrals = None, None, None, None
+           ibonds, iangles, idihedrals = None, None, None
+           
+        xyzlist = COMM.scatter(xyzlist, root=0)
+        s_bonds = COMM.scatter(s_bonds, root=0)
+        s_angles = COMM.scatter(s_angles, root=0)
+        s_dihedrals = COMM.scatter(s_dihedrals, root=0)
+
+        ibonds = COMM.bcast(ibonds, root=0)
+        iangles = COMM.bcast(iangles, root=0)
+        idihedrals = COMM.bcast(idihedrals, root=0)
+
+        s_xyzlist = np.zeros_like(xyzlist)
+        errors = np.zeros(len(xyzlist))
+        for i, xyz in enumerate(xyzlist):
+            print 'reconstructing frame %d ' % (RANK + i*SIZE)
+            s_xyzlist[i], errors[i] = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i],
+                                            iangles, s_dihedrals[i], idihedrals, xyz_guess, display=True)
+        
+        s_xyzlist = COMM.gather(s_xyzlist, root=0)
+        errors = COMM.gather(errors, root=0)
+        if RANK == 0:
+            s_xyzlist = interweave(s_xyzlist)
+            errors = interweave(errors)
+        else:
+            return None
+
+    return s_xyzlist, errors
 
 def plot_smoothing(bonds, s_bonds, angles, s_angles, dihedrals, s_dihedrals):
     """
@@ -170,5 +237,8 @@ def union_connectivity(xyzlist, atom_names):
     ibonds = np.array(sorted(set_bonds, key=lambda e: sum(e)))
     iangles = np.array(sorted(set_angles, key=lambda e: sum(e)))
     idihedrals = np.array(sorted(set_dihedrals, key=lambda e: sum(e)))
+
+    # get ALL of the possible bonds
+    ibonds = np.array(list(itertools.combinations(range(xyzlist.shape[1]), 2)))
 
     return ibonds, iangles, idihedrals

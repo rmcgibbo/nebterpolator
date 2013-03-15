@@ -154,26 +154,45 @@ def filtfit_smooth(signal, width=11, order=3):
     return output[(pad-1): -(pad-1)]
 
 
+def angular_smooth(signal, smoothing_func=filtfit_smooth, **kwargs):
+    """Smooth an signal which represents an angle by filtering its
+    sine and cosine components separately.
+    
+    Parameters
+    ----------
+    signal : np.ndarray, ndim=1
+        The input signal
+    smoothing_func : callable
+        A function that takes the signal as its first argument and smoothes
+        it.
+        
+    All other parameters (**kwargs) will be passed through to smoothing_func.
+    
+    Returns
+    -------
+    smoothed_signal : bp.ndarray, ndim=1
+        The smoothed version of the function.
+    """
+    sin = smoothing_func(np.sin(signal), **kwargs)
+    cos = smoothing_func(np.cos(signal), **kwargs)
+    return np.arctan2(sin, cos)
+    
+
 def main():
     "test code"
-    N = 100
-    sigma = 0.1
-    x = np.asarray(np.arange(N), dtype=float)
-    y = x*np.cos(10*np.random.randn()+(x + 0.0001*x**2)/ (0.05*N))
-    y *= (1+sigma*np.random.randn(N))
-
-    y_smooth = window_smooth(y, window_len=11)
-    y_smooth2 = filtfit_smooth(y, width=11, order=3)
-    y_smooth3 = polynomial_smooth(y, x, order=15, end_weight=1000)
-
     import matplotlib.pyplot as pp
-    pp.plot(x, y, 'bo')
-    pp.plot(x, y_smooth, 'r', lw=2, label='hanning window')
-    pp.plot(x, y_smooth2, 'g', lw=2, label='filtfit')
-    pp.plot(x, y_smooth3, 'c', lw=2, label='poly')
-
-    pp.legend()
+    N = 1000
+    sigma = 0.25
+    x = np.cumsum(sigma * np.random.randn(N))
+    y = np.cumsum(sigma * np.random.randn(N))
+    signal = np.arctan2(x, y)
+    pp.plot(signal)
+    
+    pp.plot(np.arctan2(filtfit_smooth(np.sin(signal), width=21),
+               filtfit_smooth(np.cos(signal), width=21)))
+    
     pp.show()
+
 
 if __name__ == '__main__':
     main()

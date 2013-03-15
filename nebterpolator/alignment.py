@@ -1,5 +1,77 @@
 import numpy as np
 
+def rmsd(query, target, operator=True):
+    """Compute the RMSD
+    
+    Parameters
+    ----------
+    return_matricies : bool
+        return the rotation and translation matricies too.
+    """
+    if not query.ndim == 2:
+        raise ValueError('query must be 2d')
+    if not target.ndim == 2:
+        raise ValueError('target must be 2d')
+    n_atoms, three = query.shape
+    if not three == 3:
+        raise ValueError('query second dimension must be 3')
+    n_atoms, three = target.shape
+    if not three == 3:
+        raise ValueError('target second dimension must be 3')
+    if not query.shape[0] == target.shape[0]:
+        raise ValueError('query and target must have same number of atoms')
+
+    # centroids
+    m_query = np.mean(query, axis=0)
+    m_target = np.mean(target, axis=0)
+
+    # centered
+    c_query = query - m_query
+    c_target = target - m_target
+
+    error_0 = np.sum(c_query**2) + np.sum(c_target**2)
+    
+    A = np.dot(c_query.T, c_target)
+    u, s, v = np.linalg.svd(A)
+    
+    d = np.diag([1, 1, np.sign(np.linalg.det(A))])
+        
+    rmsd = np.sqrt(np.abs(error_0 - (2.0 * np.sum(s))) / n_atoms)
+    
+    if operator:
+        rotation_matrix = np.dot(v.T, u.T).T
+        translation_matrix = m_query - np.dot(m_target, rotation_matrix)
+        return rmsd, AlignOperator(rotation_matrix, translation_matrix)
+    
+    return rmsd
+
+
+class AlignOperator(object):
+    def __init__(self, rot, trans):
+        self.rot = rot
+        self.trans = trans
+    
+    def __call__(self, matrix):
+        return np.dot(matrix, self.rot) + self.trans
+
+if __name__ == '__main__':
+    N = 40
+    query = np.arange(N)[:, np.newaxis] * np.random.randn(N,3)
+    target = np.arange(N)[:, np.newaxis] * np.random.randn(N,3)
+
+    dist, op =  rmsd(query, target)
+    print 'my rmsd        ', dist
+    
+    from msmbuilder.metrics import RMSD
+    _rmsdcalc = RMSD()
+    t0 = RMSD.TheoData(query[np.newaxis, :, :])
+    t1 = RMSD.TheoData(target[np.newaxis, :, :])
+    print 'msmbuilder rmsd', _rmsdcalc.one_to_all(t0, t1, 0)[0]
+    
+    print np.sqrt(np.sum(np.square(target - op(query))) / N)
+    
+    
+
 def progressive_align(xyzlist):
     """Align each frame to the one behind it.
     
@@ -29,10 +101,7 @@ def progressive_align(xyzlist):
         A = np.dot(c_xyzlist[i].T, c_xyzlist[i-1])
         v, s, wt = np.linalg.svd(A)
 
-        # # do we need to flip our coord system?
-        if  np.linalg.det(wt) * np.linalg.det(v) < 0:
-            s[-1] *= -1
-            v[:, -1] *= -1
+
 
         rotation_matrix = np.dot(v, wt)
 

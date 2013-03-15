@@ -72,6 +72,14 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         slower, but may be useful for debugging.
     display : bool, default=True
         Display summary statistics from the L-BFGS-B optimizer to stdout
+        
+        
+    Returns
+    -------
+    xyz : np.ndarray, shape=[n_atoms, 3]
+        The optimized xyz coordinates
+    error : float
+        The RMS deviation across internal DOFs
     """
 
     # TODO: expose the ability to set a weight vector over the different
@@ -167,20 +175,25 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # the 3N-6 correctly
     np.testing.assert_equal(independent_vars_to_xyz(x0), xyz_guess)
 
-    if approx_grad:
-        print 'approx grad'
-        x, cov_x, info, msg, iflag = leastsq(func, full_output=True, x0=x0)
-    else:
-        x, cov_x, info, msg, iflag = leastsq(func, col_deriv=grad,
-                                             full_output=True, x0=x0, ftol=1e-10)
+    #if approx_grad:
+    #    print 'approx grad'
+    #    x, cov_x, info, msg, iflag = leastsq(func, full_output=True, x0=x0)
 
-    xyz_final = independent_vars_to_xyz(x)
+    results = leastsq(func, col_deriv=grad, maxfev=100*len(x0),
+                      full_output=True, x0=x0, ftol=1e-5)
+    x, cov_x, info, msg, iflag = results
+    rms_error = np.sqrt(np.mean(np.square(info['fvec'])))
     if display:
-        print 'FINAL SSD:', np.sum(np.square(info['fvec']))
+        print "RMS_ERROR", rms_error
+    
+    xyz_final = independent_vars_to_xyz(x)
+
     if not iflag in [1, 2, 3, 4]:
         # these are the sucess values if the flag
-        raise Exception(msg)
-    return xyz_final
+        # raise Exception(msg)
+        print 'WARNING', msg
+
+    return xyz_final, rms_error
 
 
 def main():
