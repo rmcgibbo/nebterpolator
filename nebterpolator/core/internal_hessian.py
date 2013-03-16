@@ -26,6 +26,19 @@ __all__ = ['bond_hessian', 'angle_heddian', 'dihedral_hessian']
 ##############################################################################
 
 
+def sign3(i, j, k):
+    if i == j:
+        return 1
+    if i == k:
+        return - 1
+    else:
+        return 0
+
+
+def sign6(a, b, c, i, j, k):
+    return sign3(a,b,c)*sign3(i,j,k)
+
+
 def bond_hessian(xyz, ibonds):
     """
     Hessian of the bond lengths with respect to cartesian coordinates
@@ -85,15 +98,6 @@ def angle_hessian(xyz, iangles):
     jacobian = internal_derivs.angle_derivs(xyz, iangles)
     
     hessian = np.zeros((n_angles, n_atoms, 3, n_atoms, 3))
-    
-    def sign(i,j,k):
-        if i == j:
-            return 1
-        if i == k:
-            return - 1
-        else:
-            return 0
-        
     for i, (m, o, n) in enumerate(iangles):
         u_prime = xyz[m] - xyz[o]
         v_prime = xyz[n] - xyz[o]
@@ -118,16 +122,87 @@ def angle_hessian(xyz, iangles):
         
         for a in [m, n, o]:
             for b in [m, n, o]:
-                hessian[i, a, :, b, :] += (sign(a,m,o)*sign(b,m,o) * term1)
-                hessian[i, a, :, b, :] += (sign(a,n,o)*sign(b,n,o) * term2)
-                hessian[i, a, :, b, :] += (sign(a,m,o)*sign(b,n,o) * term3)
-                hessian[i, a, :, b, :] += (sign(a,n,o)*sign(b,m,o) * term4)
+                sign6(a,m,o, b,m,o)
+                hessian[i, a, :, b, :] += sign6(a,m,o, b,m,o) * term1
+                hessian[i, a, :, b, :] += sign6(a,n,o, b,n,o) * term2
+                hessian[i, a, :, b, :] += sign6(a,m,o, b,n,o) * term3
+                hessian[i, a, :, b, :] += sign6(a,n,o, b,m,o) * term4
     
     return hessian
 
 
+def dihedral_hessian(xyz, idihedrals):
+    n_atoms, three = xyz.shape
+    if three != 3:
+        raise TypeError('xyz must be of length 3 in the last dimension.')
+    n_dihedrals, four = idihedrals.shape
+    if four != 4:
+        raise TypeError('idihedrals must have 4 columns.')
+        
+    def sym_outer(d1, d2):
+        o = np.outer(d1, d2)
+        return o + o.T
+    
+    hessian = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3))
+    for d, (m, o, p, n) in enumerate(idihedrals):
+        u_prime = (xyz[m] - xyz[o])
+        w_prime = (xyz[p] - xyz[o])
+        v_prime = (xyz[n] - xyz[p])
+        u_norm = np.linalg.norm(u_prime)
+        w_norm = np.linalg.norm(w_prime)
+        v_norm = np.linalg.norm(v_prime)
+        u = u_prime / u_norm
+        w = w_prime / w_norm
+        v = v_prime / v_norm
+        cross_uw = np.cross(u, w)
+        cross_vw = np.cross(v, w)
+        cos_u = np.dot(u, w)
+        cos_v = -np.dot(v, w)
+        sin4_u = (1 - cos_u**2)**2
+        sin4_v = (1 - cos_v**2)**2
+        
+        term1 = sym_outer(cross_uw, w*cos_u - u) / (u_norm**2 * sin4_u)
+        term2 = sym_outer(cross_vw, w*cos_v - v) / (v_norm**2 * sin4_v)
+
+        term3 = sym_outer(cross_uw, w - 2*u*cos_u + w*cos_u**2) / (
+                    2 * u_norm * w_norm * sin4_u)
+        term4 = sym_outer(cross_vw, w + 2*v*cos_v + w*cos_v**2) / (
+                    2 * v_norm * w_norm * sin4_v)
+        term5 = sym_outer(cross_uw, u + u*cos_u**2 - 3*w*cos_u + w*cos_u**3) / (
+                    2 * w_norm**2 * sin4_u)
+        term6 = sym_outer(cross_vw, v + v*cos_v**2 + 3*w*cos_v - w*cos_v**3) / (
+                    2 * w_norm**2 * sin4_v)    
+        term7 = (w*cos_u - u) / (u_norm * w_norm * np.sqrt(1-cos_u**2))
+        term8 = (w*cos_v - v) / (v_norm * w_norm * np.sqrt(1-cos_v**2))
+
+
+        for a in [m, n, o, p]:
+            for b in [m, n, o, p]:
+                hessian[d,a,:,b,:] += sign6(a,m,o, b,m,o) * term1
+                hessian[d,a,:,b,:] += sign6(a,n,p, b,n,p) * term2
+                hessian[d,a,:,b,:] += (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m)) * term3
+                hessian[d,a,:,b,:] += (sign6(a,n,p, b,p,o) + sign6(a,p,o, b,n,p)) * term4
+                hessian[d,a,:,b,:] += sign6(a,o,p, b,p,o) * term5
+                hessian[d,a,:,b,:] += sign6(a,o,p, b,o,p) * term6
+                
+                # if a != b:
+                #     term7 = (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m))*term7
+                #     term8 = (sign6(a,n,o, b,o,p) + sign6(a,p,o, b,o,m))*term8
+                # 
+                #     M = np.zeros((3,3))
+                #     for i in range(3):
+                #         for j in range(3):
+                #             k = list(set(range(3)) - set([i,j]))[0]
+                #             hessian[d, a, i, b, j] += (j-i)*(-1.0/2.0)*np.abs(j-i) * (term7[k] + term8[k])
+                #     #hessian[d,a,i,b,:] += M
+                #     #hessian[d,a,:,b,:] += M
+                #         
+        return hessian
+        
+        
 if __name__ == '__main__':
     import internal_derivs
+    np.random.seed(10)
     
     h = 1e-7
     xyz = np.random.randn(4,3)
@@ -135,13 +210,14 @@ if __name__ == '__main__':
     xyz2[1,1] += h
     ibonds = np.array([[0,1], [0,2]])
     iangles = np.array([[0,1,2], [1,2,3]])
+    idihedrals = np.array([[0,1,2,3]])
 
-    print 'TESTING BOND HESSIAN'
-    jac1 = internal_derivs.bond_derivs(xyz, ibonds)
-    jac2 = internal_derivs.bond_derivs(xyz2, ibonds)
-    hessian = bond_hessian(xyz, ibonds)
-    print ((jac2-jac1)/h)[0]
-    print hessian[0, 1, 1]
+    # print 'TESTING BOND HESSIAN'
+    # jac1 = internal_derivs.bond_derivs(xyz, ibonds)
+    # jac2 = internal_derivs.bond_derivs(xyz2, ibonds)
+    # hessian = bond_hessian(xyz, ibonds)
+    # print ((jac2-jac1)/h)[0]
+    # print hessian[0, 1, 1]
     
     
     print '\nTESTING ANGLE HESSIAN'
@@ -149,5 +225,16 @@ if __name__ == '__main__':
     jac2 = internal_derivs.angle_derivs(xyz2, iangles)
     hessian = angle_hessian(xyz, iangles)
     print ((jac2-jac1)/h)[0]
+    print
     print hessian[0, 1, 1] 
+    
+    print '\nTESTING DIHEDRAL HESSIAN'
+    jac1 = internal_derivs.dihedral_derivs(xyz, idihedrals)
+    jac2 = internal_derivs.dihedral_derivs(xyz2, idihedrals)
+    hessian = dihedral_hessian(xyz, idihedrals)
+    print ((jac2-jac1)/h)[0]
+    print 
+    print hessian[0, 1, 1]
+    
+    print ((jac2-jac1)/h)[0] - hessian[0, 1, 1]
     
