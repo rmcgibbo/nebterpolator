@@ -14,7 +14,7 @@ from scipy.signal import lfilter, lfilter_zi, filtfilt, butter
 # Globals
 ##############################################################################
 
-__all__ = ['polynomial_smooth', 'window_smooth', 'filtfit_smooth']
+__all__ = ['polynomial_smooth', 'window_smooth', 'buttersworth_smooth']
 
 ##############################################################################
 # Functions
@@ -108,7 +108,7 @@ def window_smooth(signal, window_len=11, window='hanning'):
     return output[(window_len/2):-(window_len/2)]
 
 
-def filtfit_smooth(signal, width=11, order=3):
+def buttersworth_smooth(signal, width=11, order=3):
     """Smooth the data using zero-delay buttersworth filter
 
     This code is copied from the scipy cookbook, with sytlistic improvements.

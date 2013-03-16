@@ -15,7 +15,7 @@ from scipy.interpolate import UnivariateSpline
 import core
 from mpiutils import mpi_root
 from alignment import align_trajectory
-from smoothing import filtfit_smooth, angular_smooth
+from smoothing import buttersworth_smooth, angular_smooth
 from inversion import least_squares_cartesian
 
 ##############################################################################
@@ -104,14 +104,14 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
         s_angles = np.zeros_like(angles)
         s_dihedrals = np.zeros_like(dihedrals)
         for i in xrange(bonds.shape[1]):
-            s_bonds[:, i] = filtfit_smooth(bonds[:, i], width=bond_width)
+            s_bonds[:, i] = buttersworth_smooth(bonds[:, i], width=bond_width)
         for i in xrange(angles.shape[1]):
-            s_angles[:, i] = filtfit_smooth(angles[:, i], width=angle_width)
+            s_angles[:, i] = buttersworth_smooth(angles[:, i], width=angle_width)
         # filter the dihedrals with the angular smoother, that filters
         # the sin and cos components separately
         for i in xrange(dihedrals.shape[1]):
             s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
-                smoothing_func=filtfit_smooth, width=dihedral_width)
+                smoothing_func=buttersworth_smooth, width=dihedral_width)
 
         # group these into SIZE components, to be scattered
         xyzlist_guess = group(xyzlist_guess, SIZE)
