@@ -41,10 +41,12 @@ Code in the library
 There's some code in this library that might be of interest for other
 tasks, besides trajectory smoothing.
 
-- Compute bond length, bond angles and dihedral angles from cartesian
+- Calculation of bond lengths, bond angles and dihedral angles from cartesian
   coordinates.
-- Find an optimally-matching set of cartesian coordinates given redundant
-  internal coordinates as input
+- Analytic derivatives of bond lengths, bond angles, and dihedral angles with
+  respect to cartesian coordinates.
+- Find a set of cartesian coordinates given redundant internal coordinates
+  as input, via a least-squares optimization (Levenberg-Marquardt).
 - Context managers that make MPI code in python much more elegant.
 - Kabsch RMSD in numpy.
 
@@ -58,13 +60,13 @@ Requirements
 Getting Started
 ---------------
 
-Open up the file `client.py` and take a look. Try running it!
+Open up the file `client.py` and take a look. Try running it, either serially
+or with mpi
 
-`python client.py`
-
-or
-
-`mpirun -np 2 client.py`
+```
+$ python client.py
+$ mpirun -np 2 client.py
+```
 
 License
 -------
