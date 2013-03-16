@@ -143,11 +143,13 @@ def dihedral_hessian(xyz, idihedrals):
         o = np.outer(d1, d2)
         return o + o.T
     
+    jacobian = np.zeros((n_dihedrals, n_atoms, 3))
     hessian = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3))
+    
     for d, (m, o, p, n) in enumerate(idihedrals):
         u_prime = (xyz[m] - xyz[o])
-        w_prime = (xyz[p] - xyz[o])
         v_prime = (xyz[n] - xyz[p])
+        w_prime = (xyz[p] - xyz[o])
         u_norm = np.linalg.norm(u_prime)
         w_norm = np.linalg.norm(w_prime)
         v_norm = np.linalg.norm(v_prime)
@@ -158,8 +160,23 @@ def dihedral_hessian(xyz, idihedrals):
         cross_vw = np.cross(v, w)
         cos_u = np.dot(u, w)
         cos_v = -np.dot(v, w)
-        sin4_u = (1 - cos_u**2)**2
-        sin4_v = (1 - cos_v**2)**2
+        
+        sin2_u = (1 - cos_u**2)
+        sin2_v = (1 - cos_v**2)
+        sin4_u = sin2_u**2
+        sin4_v = sin2_v**2
+        
+        # JACOBIAN
+        jac_term1 = cross_uw / (u_norm * sin2_u)
+        jac_term2 = cross_vw / (v_norm * sin2_v)
+        jac_term3 = cross_uw * cos_u / (w_norm * sin2_u)
+        jac_term4 = cross_vw * cos_v / (w_norm * sin2_v)
+        
+        for a in [m, o, p, n]:
+            jacobian[d, a, :] += sign3(a, m, o)*jac_term1
+            jacobian[d, a, :] += sign3(a, p, n)*jac_term2
+            jacobian[d, a, :] += sign3(a, o, p)*(jac_term3 - jac_term4)
+        # END JACOBIAN
         
         term1 = sym_outer(cross_uw, w*cos_u - u) / (u_norm**2 * sin4_u)
         term2 = sym_outer(cross_vw, w*cos_v - v) / (v_norm**2 * sin4_v)
@@ -174,8 +191,7 @@ def dihedral_hessian(xyz, idihedrals):
                     2 * w_norm**2 * sin4_v)    
         term7 = (w*cos_u - u) / (u_norm * w_norm * np.sqrt(1-cos_u**2))
         term8 = (w*cos_v - v) / (v_norm * w_norm * np.sqrt(1-cos_v**2))
-
-
+        
         for a in [m, n, o, p]:
             for b in [m, n, o, p]:
                 hessian[d,a,:,b,:] += sign6(a,m,o, b,m,o) * term1
@@ -185,26 +201,25 @@ def dihedral_hessian(xyz, idihedrals):
                 hessian[d,a,:,b,:] += sign6(a,o,p, b,p,o) * term5
                 hessian[d,a,:,b,:] += sign6(a,o,p, b,o,p) * term6
                 
-                # if a != b:
-                #     term7 = (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m))*term7
-                #     term8 = (sign6(a,n,o, b,o,p) + sign6(a,p,o, b,o,m))*term8
-                # 
-                #     M = np.zeros((3,3))
-                #     for i in range(3):
-                #         for j in range(3):
-                #             k = list(set(range(3)) - set([i,j]))[0]
-                #             hessian[d, a, i, b, j] += (j-i)*(-1.0/2.0)*np.abs(j-i) * (term7[k] + term8[k])
-                #     #hessian[d,a,i,b,:] += M
-                #     #hessian[d,a,:,b,:] += M
-                #         
-        return hessian
+                
+                if a != b:
+                    _term7 = (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m))*term7
+                    _term8 = (sign6(a,n,o, b,o,p) + sign6(a,p,o, b,o,m))*term8
+            
+                    for i in range(3):
+                        for j in range(3):
+                            for k in range(3):
+                                hessian[d, a, i, b, j] += (j-i)*(-1.0/2.0)*np.abs(j-i) * (_term7[k] + _term8[k])
+
+                        
+        return jacobian, hessian
         
         
 if __name__ == '__main__':
     import internal_derivs
-    np.random.seed(10)
+    #np.random.seed(10)
     
-    h = 1e-7
+    h = 1e-10
     xyz = np.random.randn(4,3)
     xyz2 = xyz.copy()
     xyz2[1,1] += h
@@ -229,12 +244,11 @@ if __name__ == '__main__':
     print hessian[0, 1, 1] 
     
     print '\nTESTING DIHEDRAL HESSIAN'
-    jac1 = internal_derivs.dihedral_derivs(xyz, idihedrals)
-    jac2 = internal_derivs.dihedral_derivs(xyz2, idihedrals)
-    hessian = dihedral_hessian(xyz, idihedrals)
+    jac1, hessian = dihedral_hessian(xyz, idihedrals)
+    jac2, hessian = dihedral_hessian(xyz2, idihedrals)
+
+    print 'These matricies should match'
     print ((jac2-jac1)/h)[0]
     print 
-    print hessian[0, 1, 1]
-    
-    print ((jac2-jac1)/h)[0] - hessian[0, 1, 1]
+    print hessian[0][1,1]
     
