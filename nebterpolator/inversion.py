@@ -67,13 +67,10 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
     Other Parameters
     ----------------
-    approx_grad : bool, default=False
-        Use numerical gradients instead of analytical gradients. This is
-        slower, but may be useful for debugging.
-    display : bool, default=True
+    verbose : bool, default=True
         Display summary statistics from the L-BFGS-B optimizer to stdout
-        
-        
+
+
     Returns
     -------
     xyz : np.ndarray, shape=[n_atoms, 3]
@@ -89,8 +86,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # dihedrals than bonds and angles, and the bond lengths are measured in
     # different units than the angles and dihedrals.
 
-    display = kwargs.pop('display', True)
-    approx_grad = kwargs.pop('approx_grad', False)
+    verbose = kwargs.pop('verbose', False)
     for key in kwargs.keys():
         print '%s is not a recognized kwarg. ignored' % key
 
@@ -104,7 +100,6 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         raise ValueError('The size of dihedrals and idihedrals doesn\'t match')
 
     n_atoms = xyz_guess.shape[0]
-    reference_internal = np.concatenate([bonds, angles, dihedrals])
 
     def independent_vars_to_xyz(x):
         if x.ndim != 1:
@@ -142,19 +137,19 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
         # these methods require 3d input
         xyzlist = np.array([xyz])
-        bonds = core.bonds(xyzlist, ibonds)
-        angles = core.angles(xyzlist, iangles)
-        dihedrals = core.dihedrals(xyzlist, idihedrals)
+        my_bonds = core.bonds(xyzlist, ibonds).flatten()
+        my_angles = core.angles(xyzlist, iangles).flatten()
+        my_dihedrals = core.dihedrals(xyzlist, idihedrals).flatten()
 
-        # the internal coordinates corresponding to the current cartesian
-        # 1-dimensional, of length n_internal
-        current_internal = np.concatenate([bonds.flatten(), angles.flatten(),
-                                           dihedrals.flatten()])
-        result = current_internal - reference_internal
+        d1 = my_bonds - bonds
+        d2 = my_angles - angles
+        d3 = my_dihedrals - dihedrals
 
-        #if display:
-        #    print 'SSD:', np.sum(np.square(result))
-        return result
+        error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3))]
+
+        if verbose:
+            print "RMS_ERROR", np.sqrt(np.mean(np.square(error)))
+        return error
 
     def grad(x):
         xyz = independent_vars_to_xyz(x)
@@ -175,17 +170,13 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # the 3N-6 correctly
     np.testing.assert_equal(independent_vars_to_xyz(x0), xyz_guess)
 
-    #if approx_grad:
-    #    print 'approx grad'
-    #    x, cov_x, info, msg, iflag = leastsq(func, full_output=True, x0=x0)
-
-    results = leastsq(func, col_deriv=grad, maxfev=100*len(x0),
-                      full_output=True, x0=x0, ftol=1e-5)
+    results = leastsq(func, col_deriv=grad, full_output=True, x0=x0, ftol=1e-5)
     x, cov_x, info, msg, iflag = results
+
     rms_error = np.sqrt(np.mean(np.square(info['fvec'])))
-    if display:
+    if verbose:
         print "RMS_ERROR", rms_error
-    
+
     xyz_final = independent_vars_to_xyz(x)
 
     if not iflag in [1, 2, 3, 4]:

@@ -2,69 +2,71 @@
 # Imports
 ##############################################################################
 
+from nebterpolator.mpiutils import mpi_root
 from nebterpolator.io import XYZFile
-from nebterpolator.path_operations import smooth_path
-from nebterpolator.alignment import progressive_align
+from nebterpolator.path_operations import smooth_internal, smooth_cartesian
 
-try:
-    from mpi4py import MPI
-    HAVE_MPI = True
-except ImportError:
-    HAVE_MPI = False
+#from nebterpolator.alignment import align_trajectory
+#import matplotlib.pyplot as pp
 
 ##############################################################################
 # Globals
 ##############################################################################
 
-in_fn = 'reaction_015.xyz'
-out_fn = 'reaction_015.out.xyz'
+input_filename = 'reaction_015.xyz'
+output_filename = 'reaction_015.out.xyz'
 nm_in_angstrom = 0.1
-dihedral_fraction = None
-smoothing_width = 20
-angle_smoothing_width = 20
-dihedral_smoothing_width = 20
 
-if HAVE_MPI:
-    COMM = MPI.COMM_WORLD
-    RANK = COMM.Get_rank()
-    SIZE = COMM.Get_size()
-    HAVE_MPI = (SIZE > 1)
+# these two parameters are adjustable, and depend on the length of the traj
+
+# cutoff period for the internal coordinate smoother. motions with a shorter
+# period than this (higher frequency) will get filtered out
+smoothing_width = 75.0
+
+# the spline smoothing factor used for the cartesian smoothing step, that
+# runs after the internal coordinates smoother. The point of this is ONLY
+# to correct for "jitters" in the xyz coordinates that are introduced by
+# imperfections in the redundant internal coordinate -> xyz coordinate
+# step, which runs after smoothing in internal coordinates
+xyz_smoothing_strength = 2.0
+
 
 ##############################################################################
-# Functions
+# Script
 ##############################################################################
 
-def main():
-    
-    if (HAVE_MPI and RANK == 0) or not HAVE_MPI:
-        try:
-            f = XYZFile(in_fn)
-            xyzlist, atom_names = f.read_trajectory()
-        finally:
-            f.close()
-    
+
+xyzlist, atom_names = None, None
+with mpi_root():
+    with XYZFile(input_filename) as f:
+        xyzlist, atom_names = f.read_trajectory()
         # angstroms to nm
         xyzlist *= nm_in_angstrom
-    else:
-        xyzlist, atom_names = None, None
-    
-    s_xyzlist, errors = smooth_path(xyzlist, atom_names, width=smoothing_width,
-                            dihedral_fraction=dihedral_fraction,
-                            angle_width=angle_smoothing_width,
-                            dihedral_width=dihedral_smoothing_width)
-    
-    if (HAVE_MPI and RANK == 0) or not HAVE_MPI:
-        try:
-            f = XYZFile(out_fn, 'w')
-            f.write_trajectory(s_xyzlist / nm_in_angstrom, atom_names)
-        finally:
-            f.close()
-    
-        import matplotlib.pyplot as pp
-        pp.plot(errors)
-        pp.plot(xyzlist[:, 10, 2])
-        pp.show()
 
+# transform into redundant internal coordinates, apply a fourier based
+# smoothing, and then transform back to cartesian.
+# the internal -> cartesian bit is the hard step, since there's no
+# guarentee that a set of cartesian coordinates even exist that satisfy
+# the redundant internal coordinates, after smoothing.
 
-if __name__ == '__main__':
-    main()
+# we're using a levenberg-marquardt optimizer to find the "most consistent"
+# cartesian coordinates
+
+# currently, the choice of what internal coordinates to use is buried
+# a little in the code, in the function path_operations.union_connectivity
+# basically, we're using ALL pairwise distances, all of the angles between
+# sets of three atoms, a-b-c, that actually get "bonded" during the
+# trajectory, and all of the dihedral angles between sets of 4 atoms,
+# a-b-c-d, that actually get "bonded" during the trajectory.
+smoothed, errors = smooth_internal(xyzlist, atom_names, width=smoothing_width)
+
+with mpi_root():
+    # apply a bit of spline smoothing in cartesian coordinates to
+    # correct for jitters
+    jitter_free = smooth_cartesian(smoothed,
+                                strength=xyz_smoothing_strength,
+                                weights=1.0/errors)
+
+    print 'Saving output'
+    with XYZFile(output_filename, 'w') as f:
+        f.write_trajectory(jitter_free / nm_in_angstrom, atom_names)

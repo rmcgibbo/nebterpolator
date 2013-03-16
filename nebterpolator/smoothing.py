@@ -50,8 +50,8 @@ def polynomial_smooth(y, x=None, order=2, end_weight=1):
     # need 1 more for the constant, so that order 2 is quadratic
     # (even though it's 3 params)
     #popt, pcov = curve_fit(func, x, y, p0=np.ones(order+1), sigma=1.0/weights)
-    popt, covp, info, msg, ier = leastsq(func, x0=np.zeros(order+1), full_output=True)
-
+    popt, covp, info, msg, ier = leastsq(func, x0=np.zeros(order+1),
+                                         full_output=True)
     return np.polyval(popt, x)
 
 
@@ -96,7 +96,9 @@ def window_smooth(signal, window_len=11, window='hanning'):
                          "'bartlett', 'blackman'")
 
     # this does a mirroring padding
-    padded = np.r_[signal[window_len-1: 0: -1], signal, signal[-1: -window_len: -1]]
+    padded = np.r_[signal[window_len-1: 0: -1],
+                   signal,
+                   signal[-1: -window_len: -1]]
 
     if window == 'flat':
         w = np.ones(window_len, 'd')
@@ -131,9 +133,8 @@ def filtfit_smooth(signal, width=11, order=3):
     output : np.ndarray, ndim=1
         The smoothed signal
     """
-    width = float(width)
     if width < 2.0:
-        raise ValueError('Width must be greater than or equal to 2')
+        return signal
 
     # first pad the signal on the ends
     pad = int(np.ceil((width + 1)/2)*2 - 1)  # nearest odd integer
@@ -157,7 +158,7 @@ def filtfit_smooth(signal, width=11, order=3):
 def angular_smooth(signal, smoothing_func=filtfit_smooth, **kwargs):
     """Smooth an signal which represents an angle by filtering its
     sine and cosine components separately.
-    
+
     Parameters
     ----------
     signal : np.ndarray, ndim=1
@@ -165,9 +166,9 @@ def angular_smooth(signal, smoothing_func=filtfit_smooth, **kwargs):
     smoothing_func : callable
         A function that takes the signal as its first argument and smoothes
         it.
-        
+
     All other parameters (**kwargs) will be passed through to smoothing_func.
-    
+
     Returns
     -------
     smoothed_signal : bp.ndarray, ndim=1
@@ -176,7 +177,7 @@ def angular_smooth(signal, smoothing_func=filtfit_smooth, **kwargs):
     sin = smoothing_func(np.sin(signal), **kwargs)
     cos = smoothing_func(np.cos(signal), **kwargs)
     return np.arctan2(sin, cos)
-    
+
 
 def main():
     "test code"
@@ -187,10 +188,10 @@ def main():
     y = np.cumsum(sigma * np.random.randn(N))
     signal = np.arctan2(x, y)
     pp.plot(signal)
-    
+
     pp.plot(np.arctan2(filtfit_smooth(np.sin(signal), width=21),
-               filtfit_smooth(np.cos(signal), width=21)))
-    
+                       filtfit_smooth(np.cos(signal), width=21)))
+
     pp.show()
 
 

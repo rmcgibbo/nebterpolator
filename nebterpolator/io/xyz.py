@@ -31,6 +31,7 @@ class XYZFile(object):
             The mode in which to open the file
         """
         self._handle = open(filename, mode)
+        self._closed = False
 
     def read_frame(self):
         """Read a single molecule/frame from an xyz file
@@ -100,7 +101,9 @@ class XYZFile(object):
         self.close()
 
     def close(self):
-        self._handle.close()
+        if not self._closed:
+            self._handle.close()
+            self._closed = True
 
     def write_frame(self, xyz, atom_names, comment=None):
         """Write a single frame to an xyz format file
@@ -152,14 +155,8 @@ class XYZFile(object):
         for xyz in xyzlist:
             self.write_frame(xyz, atom_names, comment)
 
+    def __enter__(self):
+        return self
 
-def main():
-    f = XYZFile('/Users/rmcgibbo/projects/nebterpolator/reaction_015.xyz')
-    print f.read_trajectory()
-
-    f = XYZFile('tmp.xyz', 'w')
-    f.write_trajectory(np.random.randn(1, 10, 3), ['a' for i in range(10)])
-    f.close()
-    print open('tmp.xyz').readlines()
-if __name__ == '__main__':
-    main()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
