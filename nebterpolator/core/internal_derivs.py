@@ -13,6 +13,8 @@ import numpy as np
 # GLOBALS
 ##############################################################################
 
+VECTOR1 = np.array([1, -1, 1]) / np.sqrt(3)
+VECTOR2 = np.array([-1, 1, 1]) / np.sqrt(3)
 __all__ = ['bond_derivs', 'angle_derivs', 'dihedral_derivs']
 
 ##############################################################################
@@ -117,8 +119,6 @@ def angle_derivs(xyz, iangles):
                           'n_atoms-1 inclusive. They are zero indexed'))
 
     derivatives = np.zeros((n_angles, n_atoms, 3))
-    vector1 = np.array([1, -1, 1]) / np.sqrt(3)
-    vector2 = np.array([-1, 1, 1]) / np.sqrt(3)
 
     for a, (m, o, n) in enumerate(iangles):
         u_prime = (xyz[m] - xyz[o])
@@ -130,20 +130,23 @@ def angle_derivs(xyz, iangles):
 
         if np.linalg.norm(u + v) < 1e-10 or np.linalg.norm(u - v) < 1e-10:
             # if they're parallel
-            if ((np.linalg.norm(u + vector1) < 1e-10) or
-                    (np.linalg.norm(u - vector1) < 1e-10)):
+            if ((np.linalg.norm(u + VECTOR1) < 1e-10) or
+                    (np.linalg.norm(u - VECTOR2) < 1e-10)):
                 # and they're parallel o [1, -1, 1]
-                w_prime = np.cross(u, vector2)
+                w_prime = np.cross(u, VECTOR2)
             else:
-                w_prime = np.cross(u, vector1)
+                w_prime = np.cross(u, VECTOR1)
         else:
             w_prime = np.cross(u, v)
 
         w = w_prime / np.linalg.norm(w_prime)
+        
+        term1 = np.cross(u, w) / u_norm
+        term2 = np.cross(w, v) / v_norm
 
-        derivatives[a, m, :] = np.cross(u, w) / u_norm
-        derivatives[a, n, :] = np.cross(w, v) / v_norm
-        derivatives[a, o, :] = -np.cross(u, w) / u_norm - np.cross(w, v) / v_norm
+        derivatives[a, m, :] = term1
+        derivatives[a, n, :] = term2
+        derivatives[a, o, :] = -(term1 + term2)
 
     return derivatives
 
