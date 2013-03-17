@@ -1,0 +1,61 @@
+import pyximport
+import numpy as np
+import time
+pyximport.install(setup_args={'include_dirs': np.get_include()})
+from fast_internal import bond_lengths, bond_angles, dihedral_angles
+import internal
+import internal_derivs
+import internal_hessian
+
+#np.random.seed(42)
+xyz = np.random.randn(4,3)
+ibonds = np.array([[0,1], [1,2]])
+iangles = np.array([[0,1,2]])
+idihedrals = np.array([[0,1,2,3]])
+
+
+# t0 = time.time()
+# for i in range(2000):
+#     result = bond_angles(xyz, iangles, 2)
+# t1 = time.time()
+# print t1-t0
+
+
+x, j, h = bond_lengths(xyz, ibonds, 2)
+rx = internal.bonds([xyz], ibonds).flatten()
+rj = internal_derivs.bond_derivs(xyz, ibonds)
+rh = internal_hessian.bond_hessian(xyz, ibonds)
+print 'BOND LENGTHS'
+print 'X RMS ERROR', np.sqrt(np.mean((x - rx)**2))
+print 'J RMS ERROR', np.sqrt(np.mean((j - rj)**2))
+print 'H RMS ERROR', np.sqrt(np.mean((h - rh)**2))
+
+
+x, j, h = bond_angles(xyz, iangles, 2)
+rx = internal.angles([xyz], iangles).flatten()
+rj = internal_derivs.angle_derivs(xyz, iangles)
+rh = internal_hessian.angle_hessian(xyz, iangles)
+print '\nBOND ANGLES'
+print 'X RMS ERROR', np.sqrt(np.mean((x - rx)**2))
+print 'J RMS ERROR', np.sqrt(np.mean((j - rj)**2))
+print 'H RMS ERROR', np.sqrt(np.mean((h - rh)**2))
+
+x, j, h = dihedral_angles(xyz, idihedrals, 2)
+rx = internal.dihedrals([xyz], idihedrals).flatten()
+rj = internal_derivs.dihedral_derivs(xyz, idihedrals)
+print '\nDIHEDRAL ANGLES'
+print 'X RMS ERROR', np.sqrt(np.mean((x - rx)**2))
+print 'J RMS ERROR', np.sqrt(np.mean((j - rj)**2))
+
+xyz2 = xyz.copy()
+step = 1e-7
+xyz2[0,0] += step
+x2, j2, h2 = dihedral_angles(xyz2, idihedrals, 2)
+
+print 'These matricies should match'
+print ((j2-j)/step)[0]
+print 
+print h[0][0,0]
+
+
+print np.abs(((j2-j)/step)[0] - h[0][0,0]) < 1e-4
