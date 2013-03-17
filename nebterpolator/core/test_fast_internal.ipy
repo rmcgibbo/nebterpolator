@@ -7,7 +7,7 @@ import internal
 import internal_derivs
 import internal_hessian
 
-np.random.seed(10)
+#np.random.seed(13)
 xyz = np.random.randn(4,3)
 ibonds = np.array([[0,1], [1,2]])
 iangles = np.array([[0,1,2]])
@@ -57,5 +57,5 @@ print ((j2-j)/step)[0]
 print 
 print h[0][0,0]
 
-
-print np.abs(((j2-j)/step)[0] - h[0][0,0]) < 1e-4
+print 'difference matrix'
+print ((j2-j)/step)[0] - h[0][0,0]

@@ -169,6 +169,8 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
     cdef np.ndarray[ndim=1, dtype=np.double_t] w, w_prime
     cdef np.ndarray[ndim=1, dtype=np.double_t] cross_vw, cross_uw
     cdef np.ndarray[ndim=1, dtype=np.double_t] term1, term2, term3, term4
+    cdef np.ndarray[ndim=2, dtype=np.double_t] ht1, ht2, ht3, ht4, ht5, ht6, ht7, ht8, factor
+    cdef int m1, m2, m3, m4, m5, m6, m7, m8
 
     n_atoms = xyz.shape[0]
     if xyz.shape[1] != 3:
@@ -192,11 +194,11 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         o = idihedrals[i, 1]
         p = idihedrals[i, 2]
         n = idihedrals[i, 3]
-        
+
         u_prime = xyz[m] - xyz[o]
         v_prime = xyz[n] - xyz[p]
         w_prime = xyz[p] - xyz[o]
-        
+
         u_norm = norm3(u_prime)
         v_norm = norm3(v_prime)
         w_norm = norm3(w_prime)
@@ -205,18 +207,18 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         w = w_prime / w_norm
         dot_uw = dot3(u, w)
         dot_vw = dot3(v, w)
-        
+
         # use the non-normalized vectors
         cross_vw = cross3(v_prime, w_prime)
         cross_uw = cross3(u_prime, w_prime)
         dihedral_angles[i] = atan2(dot3(u_prime, cross_vw) * w_norm, dot3(cross_vw, cross_uw))
         # dihedral_angles[i] = acos(dot3(cross3(u, w), cross3(v, w)) / sqrt((1-dot_uw*dot_uw) * (1-dot_wv*dot_wv)))
-        
+
         if deriv >= 1:
             # now normalize the vectors
             cross_vw /= (v_norm * w_norm)
             cross_uw /= (u_norm * w_norm)
-            
+
             term1 = cross_uw / (u_norm * (1 - dot_uw*dot_uw))
             term2 = cross_vw / (v_norm * (1 - dot_vw*dot_vw))
             term3 = cross_uw * dot_uw / (w_norm * (1 - dot_uw*dot_uw))
@@ -228,38 +230,54 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
             jacobian[i, p, :] = term2 - term3 + term4
 
         if deriv == 2:
+            ht1 = sym_outer3(cross_uw, w*dot_uw - u) / (u_norm**2 * (1 - dot_uw**2)**2)
+            ht2 = sym_outer3(cross_vw, w*dot_vw - v) / (v_norm**2 * (1 - dot_vw**4)**2)
+            ht3 = sym_outer3(cross_uw, w - 2*u*dot_uw + w*dot_uw**2) / (2*u_norm * w_norm * (1 - dot_uw**2)**2)
+            ht4 = sym_outer3(cross_vw, w - 2*u*dot_vw + w*dot_vw**2) / (2*v_norm * w_norm * (1 - dot_vw**2)**2)
+            ht5 = sym_outer3(cross_uw, u + u*dot_uw**2 - 3*w*dot_uw + w*dot_uw**3) / (2*w_norm**2 * (1-dot_uw**2)**2)
+            ht6 = sym_outer3(cross_vw, v + v*dot_vw**2 - 3*w*dot_vw + w*dot_uw**3) / (2*w_norm**2 * (1-dot_vw**2)**2)
+            ht7 = splay3((w*dot_uw - u)  / (u_norm * w_norm * (1-dot_uw**2)))
+            ht8 = splay3((-w*dot_vw - v) / (v_norm * w_norm * (1-dot_vw**2)))
+
             for a in [m, n, o, p]:
                 for b in [m, n, o, p]:
-                    for ii in [0, 1, 2]:
-                        for jj in [0, 1, 2]:
-                            for kk in [0, 1, 2]:
-                                if (kk == ii) or (kk == jj):
-                                    continue
-                                t1 = sign6(a,m,o, b,m,o) * cross_uw[ii]*(w[jj]*dot_uw - u[jj]) / (u_norm**2 * (1 - dot_uw**2)**2)
-                                t2 = sign6(a,n,p, b,n,p) * cross_vw[ii]*(w[jj]*dot_vw - v[jj]) / (v_norm**2 * (1 - dot_vw**4)**2)
-                                t3 = (sign6(a,m,o, b,o,p) + sign6(a,p,o,b,o,p)) * cross_uw[ii]*(w[jj] - 2*u[jj]*dot_uw + w[jj]*dot_uw**2) / (2*u_norm * w_norm * (1 - dot_uw**2)**2)
-                                t4 = (sign6(a,n,p, b,p,o) + sign6(a,p,o,b,n,p)) * cross_vw[ii]*(w[jj] - 2*u[jj]*dot_vw + w[jj]*dot_vw**2) / (2*v_norm * w_norm * (1 - dot_vw**2)**2)
-                                t5 = sign6(a,o,p, b,p,o) * cross_uw[ii] * (u[jj] + u[jj]*dot_uw**2 - 3*w[jj]*dot_uw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_uw**2)**2)
-                                t6 = sign6(a,o,p, b,o,p) * cross_vw[ii] * (v[jj] + v[jj]*dot_vw**2 - 3*w[jj]*dot_vw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_vw**2)**2)
+                    factor = np.zeros((3,3))
 
-                                t7 = (1-kron(a,b))*(sign6(a,m,o,b,o,p) + sign6(a,p,o,b,o,m)) * (jj-ii) * (-0.5**abs(jj-ii)) * (w[kk]*dot_uw - u[kk])  / (u_norm * w_norm * (1-dot_uw**2))
-                                t8 = (1-kron(a,b))*(sign6(a,n,o,b,o,p) + sign6(a,p,o,b,o,m)) * (jj-ii) * (-0.5**abs(jj-ii)) * (-w[kk]*dot_vw - v[kk]) / (v_norm * w_norm * (1-dot_vw**2))
-                                                                
-                                hessian[i, a, ii, b, jj]  = t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8
-                                hessian[i, a, jj, b, ii] += t1 + t2 + t3 + t4 + t5 + t6
-                                
-                                
-        if deriv == 2:
-            t1 = cross_uw[ii]*(w[jj]*dot_uw - u[jj]) / (u_norm**2 * (1 - dot_uw**2)**2)
-            
-        
-        
+                    m1 = sign6(a,m,o, b,m,o)
+                    m2 = sign6(a,n,p, b,n,p)
+                    m3 = (sign6(a,m,o, b,o,p) + sign6(a,p,o,b,o,p))
+                    m4 = (sign6(a,n,p, b,p,o)  + sign6(a,p,o, b,n,o))
+                    m5 = sign6(a,o,p, b,p,o)
+                    m6 = sign6(a,o,p, b,o,p)
+                    m7 = (1-kron(a,b))*(sign6(a,m,o,b,o,p) + sign6(a,p,o,b,o,m))
+                    m8 = (1-kron(a,b))*(sign6(a,n,o,b,o,p) + sign6(a,p,o,b,o,m))
+
+                    if m1 != 0:
+                        factor += m1*ht1
+                    if m2 != 0:
+                        factor += m2*ht2
+                    if m3 != 0:
+                        factor += m3*ht3
+                    if m4 != 0:
+                        factor += m4*ht4
+                    if m5 != 0:
+                        factor += m5*ht5
+                    if m6 != 0:
+                        factor += m6*ht6
+                    if m7 != 0:
+                        factor += m7*ht7
+                    if m8  != 0:
+                        factor += m8*ht7
+
+                    hessian[i, a, :, b, :] = factor
+
     if deriv == 0:
         return dihedral_angles
     elif deriv == 1:
         return dihedral_angles, jacobian
     else:
         return dihedral_angles, jacobian, hessian
+
 
 
 #############################################################################
@@ -330,8 +348,41 @@ cdef np.ndarray[ndim=2, dtype=np.double_t] outer3(
 
     return result
 
+cdef np.ndarray[ndim=2, dtype=np.double_t] sym_outer3(
+            np.ndarray[np.double_t, ndim=1, mode='c'] v1,
+            np.ndarray[np.double_t, ndim=1, mode='c'] v2):
+    """Symmetrized Outer product
+    """
+    cdef np.ndarray[dtype=np.double_t, ndim=2] result
+    result = np.empty((3,3), dtype=np.double)
 
-cdef int sign3(int i, int j, int k):
+    result[0,0] = 2*v1[0]*v2[0]
+    result[0,1] = v1[0]*v2[1] + v1[1]*v2[0]
+    result[0,2] = v1[0]*v2[2] + v1[2]*v2[0]
+    result[1,0] = v1[0]*v2[1] + v1[1]*v2[0]
+    result[1,1] = 2*v1[1]*v2[1]
+    result[1,2] = v1[1]*v2[2] + v1[2]*v2[1]
+    result[2,0] = v1[0]*v2[2] + v1[2]*v2[0]
+    result[2,1] = v1[1]*v2[2] + v1[2]*v2[1]
+    result[2,2] = 2*v1[2]*v2[2]
+
+    return result
+
+
+def splay3(v):
+    cdef np.ndarray[dtype=np.double_t, ndim=2] result
+    result = np.zeros((3,3), dtype=np.double)
+
+    result[0,1] = -v[2] / 2.0
+    result[1,0] = v[2] / 2.0
+    result[0,2] = -v[1] / 4.0
+    result[2,0] = v[1] / 4.0
+    result[1,2] = -v[0] / 2.0
+    result[2,1] = v[0] / 2.0
+
+    return result
+
+cdef inline int sign3(int i, int j, int k):
     if i == j:
         return 1
     if i == k:
@@ -340,12 +391,12 @@ cdef int sign3(int i, int j, int k):
         return 0
 
 
-cdef int sign6(int a, int b, int c, int i, int j, int k):
+cdef inline int sign6(int a, int b, int c, int i, int j, int k):
     return sign3(a,b,c)*sign3(i,j,k)
 
-def kron(i,j):
+
+cdef inline int kron(int i, int j):
     if i == j:
         return 1
     else:
         return 0
-    
