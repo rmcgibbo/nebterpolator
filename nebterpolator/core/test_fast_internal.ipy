@@ -7,7 +7,7 @@ import internal
 import internal_derivs
 import internal_hessian
 
-#np.random.seed(42)
+np.random.seed(10)
 xyz = np.random.randn(4,3)
 ibonds = np.array([[0,1], [1,2]])
 iangles = np.array([[0,1,2]])

@@ -234,27 +234,20 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
                             for kk in [0, 1, 2]:
                                 if (kk == ii) or (kk == jj):
                                     continue
-                                t1 = sign6(a,m,o,b,m,o) * cross_uw[ii]*(w[jj]*dot_uw - u[jj]) / (u_norm**2 * (1 - dot_uw**2)**2)
-                                t2 = sign6(a,n,p,b,n,p) * cross_vw[ii]*(w[jj]*dot_vw - v[jj]) / (v_norm**2 * (1 - dot_vw**4)**2)
-                                t3 = (sign6(a,m,o,b,o,p) + sign6(a,p,o,b,o,m)) * cross_uw[ii]*(w[jj] - 2*u[jj]*dot_uw + w[jj]*dot_uw**2) / (2*u_norm * w_norm * (1 - dot_uw**2)**2)
-                                t4 = (sign6(a,n,p,b,p,o) + sign6(a,p,o,b,n,p)) * cross_vw[ii]*(w[jj] - 2*u[jj]*dot_vw + w[jj]*dot_vw**2) / (2*v_norm * w_norm * (1 - dot_vw**2)**2)
-                                t5 = sign6(a,o,p,b,p,o) * cross_uw[ii] * (u[jj] + u[jj]*dot_uw**2 - 3*w[jj]*dot_uw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_uw**2)**2)
-                                t6 = sign6(a,o,p,b,o,p) * cross_vw[ii] * (v[jj] + v[jj]*dot_vw**2 - 3*w[jj]*dot_vw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_vw**2)**2)
-                                
-                                # t1 is good
-                                # t2 could be bad, setting it to zero doesn't mess up anything
-                                # t3 is good, setting it to zero messes stuff up
-                                t6 = sign6(a,o,p,b,o,p) * 100*np.random.randn()
-                                t5 = sign6(a,o,p,b,p,o) * 1000*np.random.randn()
-                                t4 = sign6(a,n,p,b,p,o) * 1000*np.random.randn()
+                                t1 = sign6(a,m,o, b,m,o) * cross_uw[ii]*(w[jj]*dot_uw - u[jj]) / (u_norm**2 * (1 - dot_uw**2)**2)
+                                t2 = sign6(a,n,p, b,n,p) * cross_vw[ii]*(w[jj]*dot_vw - v[jj]) / (v_norm**2 * (1 - dot_vw**4)**2)
+                                t3 = (sign6(a,m,o, b,o,p) + sign6(a,p,o,b,o,p)) * cross_uw[ii]*(w[jj] - 2*u[jj]*dot_uw + w[jj]*dot_uw**2) / (2*u_norm * w_norm * (1 - dot_uw**2)**2)
+                                t4 = (sign6(a,n,p, b,p,o) + sign6(a,p,o,b,n,p)) * cross_vw[ii]*(w[jj] - 2*u[jj]*dot_vw + w[jj]*dot_vw**2) / (2*v_norm * w_norm * (1 - dot_vw**2)**2)
+                                t5 = sign6(a,o,p, b,p,o) * cross_uw[ii] * (u[jj] + u[jj]*dot_uw**2 - 3*w[jj]*dot_uw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_uw**2)**2)
+                                t6 = sign6(a,o,p, b,o,p) * cross_vw[ii] * (v[jj] + v[jj]*dot_vw**2 - 3*w[jj]*dot_vw + w[jj]*dot_uw**3) / (2*w_norm**2 * (1-dot_vw**2)**2)
 
                                 t7 = (1-kron(a,b))*(sign6(a,m,o,b,o,p) + sign6(a,p,o,b,o,m)) * (jj-ii) * (-0.5**abs(jj-ii)) * (w[kk]*dot_uw - u[kk])  / (u_norm * w_norm * (1-dot_uw**2))
                                 t8 = (1-kron(a,b))*(sign6(a,n,o,b,o,p) + sign6(a,p,o,b,o,m)) * (jj-ii) * (-0.5**abs(jj-ii)) * (-w[kk]*dot_vw - v[kk]) / (v_norm * w_norm * (1-dot_vw**2))
                                                                 
-                                #t7 = (1-kron(a,b))*(sign6(a,m,o,b,o,p) + sign6(a,p,o,b,o,m)) *  (jj-ii) * 10
-
-                                hessian[i, a, ii, b, jj] = t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8
+                                hessian[i, a, ii, b, jj]  = t1 + t2 + t3 + t4 + t5 + t6 + t7 + t8
                                 hessian[i, a, jj, b, ii] += t1 + t2 + t3 + t4 + t5 + t6
+                                
+                                
             
         
         
