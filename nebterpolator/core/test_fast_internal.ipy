@@ -7,18 +7,19 @@ import internal
 import internal_derivs
 import internal_hessian
 
-#np.random.seed(13)
+np.random.seed(13)
 xyz = np.random.randn(4,3)
 ibonds = np.array([[0,1], [1,2]])
 iangles = np.array([[0,1,2]])
 idihedrals = np.array([[0,1,2,3]])
 
 
-# t0 = time.time()
-# for i in range(2000):
-#     result = bond_angles(xyz, iangles, 2)
-# t1 = time.time()
-# print t1-t0
+t0 = time.time()
+for i in range(2000):
+    #result = bond_angles(xyz, iangles, 0)
+    result = dihedral_angles(xyz, idihedrals, 2)
+t1 = time.time()
+print t1-t0
 
 
 x, j, h = bond_lengths(xyz, ibonds, 2)

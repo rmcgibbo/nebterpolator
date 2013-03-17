@@ -18,6 +18,8 @@ def bond_lengths(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
     cdef double t01, t02, t12
     cdef np.ndarray[ndim=2, dtype=np.double_t] hessian_term0
     cdef np.ndarray[ndim=1, dtype=np.double_t] u
+    cdef np.ndarray[ndim=3, dtype=np.double_t] jacobian
+    cdef np.ndarray[ndim=5, dtype=np.double_t] hessian
 
     # do some checking
     n_atoms = xyz.shape[0]
@@ -30,7 +32,7 @@ def bond_lengths(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         raise ValueError('deriv must be 0, 1, 2')
 
     # declare the output arrays
-    bond_lengths = np.zeros(n_bonds, dtype=np.double)
+    bond_lengths = np.empty(n_bonds, dtype=np.double)
     if deriv >= 1:
         jacobian = np.zeros((n_bonds, n_atoms, 3), dtype=np.double)
     if deriv == 2:
@@ -76,6 +78,8 @@ def bond_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
     cdef np.ndarray[ndim=1, dtype=np.double_t] w, w_prime
     cdef np.ndarray[ndim=1, dtype=np.double_t] jacobian_term0, jacobian_term1
     cdef np.ndarray[ndim=2, dtype=np.double_t] uu, vv, uv, term1, term2, term3, term4
+    cdef np.ndarray[ndim=3, dtype=np.double_t] jacobian
+    cdef np.ndarray[ndim=5, dtype=np.double_t] hessian
 
     n_atoms = xyz.shape[0]
     if xyz.shape[1] != 3:
@@ -87,7 +91,7 @@ def bond_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         raise ValueError('deriv must be 0, 1, 2')
 
     # declare the output arrays
-    bond_angles = np.zeros(n_angles, dtype=np.double)
+    bond_angles = np.empty(n_angles, dtype=np.double)
     if deriv >= 1:
         jacobian = np.zeros((n_angles, n_atoms, 3), dtype=np.double)
     if deriv == 2:
@@ -164,13 +168,16 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
     """
     cdef int i, m, o, p, n, n_atoms, n_dihedrals
     cdef double u_norm, v_norm, w_norm
+    cdef double dot_uw, dot_vw, dot_uw2, dot_vw2, sin4_u, sin4_v
     cdef np.ndarray[ndim=1, dtype=np.double_t] u, u_prime
     cdef np.ndarray[ndim=1, dtype=np.double_t] v, v_prime,
     cdef np.ndarray[ndim=1, dtype=np.double_t] w, w_prime
     cdef np.ndarray[ndim=1, dtype=np.double_t] cross_vw, cross_uw
-    cdef np.ndarray[ndim=1, dtype=np.double_t] term1, term2, term3, term4
+    cdef np.ndarray[ndim=1, dtype=np.double_t] term1, term2, term3, term4, dihedral_angles
     cdef np.ndarray[ndim=2, dtype=np.double_t] ht1, ht2, ht3, ht4, ht5, ht6, ht7, ht8, factor
     cdef int m1, m2, m3, m4, m5, m6, m7, m8
+    cdef np.ndarray[ndim=3, dtype=np.double_t] jacobian
+    cdef np.ndarray[ndim=5, dtype=np.double_t] hessian
 
     n_atoms = xyz.shape[0]
     if xyz.shape[1] != 3:
@@ -182,11 +189,11 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         raise ValueError('deriv must be 0, 1, 2')
 
     # declare the output arrays
-    dihedral_angles = np.zeros(n_dihedrals, dtype=np.double)
+    dihedral_angles = np.empty(n_dihedrals, dtype=np.double)
     if deriv >= 1:
         jacobian = np.zeros((n_dihedrals, n_atoms, 3), dtype=np.double)
     if deriv == 2:
-        hessian2 = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3), dtype=np.double)
+        #hessian2 = np.zeros((n_dihedrals, n_atoms, n_atoms, 3, 3), dtype=np.double)
         hessian = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3), dtype=np.double)
 
     for i in range(n_dihedrals):
@@ -207,6 +214,8 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
         w = w_prime / w_norm
         dot_uw = dot3(u, w)
         dot_vw = dot3(v, w)
+        dot_uw2 = dot_uw*dot_uw
+        dot_vw2 = dot_vw*dot_vw
 
         # use the non-normalized vectors
         cross_vw = cross3(v_prime, w_prime)
@@ -219,10 +228,10 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
             cross_vw /= (v_norm * w_norm)
             cross_uw /= (u_norm * w_norm)
 
-            term1 = cross_uw / (u_norm * (1 - dot_uw*dot_uw))
-            term2 = cross_vw / (v_norm * (1 - dot_vw*dot_vw))
-            term3 = cross_uw * dot_uw / (w_norm * (1 - dot_uw*dot_uw))
-            term4 = -cross_vw * dot_vw / (w_norm * (1 - dot_vw*dot_vw))
+            term1 = cross_uw / (u_norm * (1 - dot_uw2))
+            term2 = cross_vw / (v_norm * (1 - dot_vw2))
+            term3 = cross_uw * dot_uw / (w_norm * (1 - dot_uw2))
+            term4 = -cross_vw * dot_vw / (w_norm * (1 - dot_vw2))
 
             jacobian[i, m, :] = term1
             jacobian[i, n, :] = -term2
@@ -230,18 +239,21 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
             jacobian[i, p, :] = term2 - term3 + term4
 
         if deriv == 2:
-            ht1 = sym_outer3(cross_uw, w*dot_uw - u) / (u_norm**2 * (1 - dot_uw**2)**2)
-            ht2 = sym_outer3(cross_vw, w*dot_vw - v) / (v_norm**2 * (1 - dot_vw**4)**2)
-            ht3 = sym_outer3(cross_uw, w - 2*u*dot_uw + w*dot_uw**2) / (2*u_norm * w_norm * (1 - dot_uw**2)**2)
-            ht4 = sym_outer3(cross_vw, w - 2*u*dot_vw + w*dot_vw**2) / (2*v_norm * w_norm * (1 - dot_vw**2)**2)
-            ht5 = sym_outer3(cross_uw, u + u*dot_uw**2 - 3*w*dot_uw + w*dot_uw**3) / (2*w_norm**2 * (1-dot_uw**2)**2)
-            ht6 = sym_outer3(cross_vw, v + v*dot_vw**2 - 3*w*dot_vw + w*dot_uw**3) / (2*w_norm**2 * (1-dot_vw**2)**2)
-            ht7 = splay3((w*dot_uw - u)  / (u_norm * w_norm * (1-dot_uw**2)))
-            ht8 = splay3((-w*dot_vw - v) / (v_norm * w_norm * (1-dot_vw**2)))
+            sin4_u = (1 - dot_uw2)*(1 - dot_uw2)
+            sin4_v = (1 - dot_vw2)*(1 - dot_vw2)
+
+            ht1 = sym_outer3(cross_uw, w*dot_uw - u) / (u_norm*u_norm * sin4_u)
+            ht2 = sym_outer3(cross_vw, w*dot_vw - v) / (v_norm*v_norm * sin4_v)
+            ht3 = sym_outer3(cross_uw, w - 2*u*dot_uw + w*dot_uw2) / (2*u_norm * w_norm * sin4_u)
+            ht4 = sym_outer3(cross_vw, w - 2*u*dot_vw + w*dot_vw2) / (2*v_norm * w_norm * sin4_v)
+            ht5 = sym_outer3(cross_uw, u + u*dot_uw2 - w*(3*dot_uw + dot_uw2)) / (2*w_norm*w_norm * sin4_u)
+            ht6 = sym_outer3(cross_vw, v + v*dot_vw2 - w*(3*dot_vw + dot_uw2)) / (2*w_norm*w_norm * sin4_v)
+            ht7 = splay3((w*dot_uw - u)  / (u_norm * w_norm * (1-dot_uw2)))
+            ht8 = splay3((-w*dot_vw - v) / (v_norm * w_norm * (1-dot_vw2)))
 
             for a in [m, n, o, p]:
                 for b in [m, n, o, p]:
-                    factor = np.zeros((3,3))
+                    factor = np.zeros((3,3), dtype=np.double)
 
                     m1 = sign6(a,m,o, b,m,o)
                     m2 = sign6(a,n,p, b,n,p)
@@ -270,6 +282,7 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
                         factor += m8*ht7
 
                     hessian[i, a, :, b, :] = factor
+
 
     if deriv == 0:
         return dihedral_angles
