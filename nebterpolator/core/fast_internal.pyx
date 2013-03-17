@@ -1,5 +1,3 @@
-#cython: boundscheck=False
-#cython: wraparound=False
 from __future__ import division
 import numpy as np
 cimport numpy as np
