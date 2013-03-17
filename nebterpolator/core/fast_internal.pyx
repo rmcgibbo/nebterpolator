@@ -184,6 +184,7 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
     if deriv >= 1:
         jacobian = np.zeros((n_dihedrals, n_atoms, 3), dtype=np.double)
     if deriv == 2:
+        hessian2 = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3), dtype=np.double)
         hessian = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3), dtype=np.double)
 
     for i in range(n_dihedrals):
@@ -248,6 +249,8 @@ def dihedral_angles(np.ndarray[np.double_t, ndim=2, mode='c'] xyz not None,
                                 hessian[i, a, jj, b, ii] += t1 + t2 + t3 + t4 + t5 + t6
                                 
                                 
+        if deriv == 2:
+            t1 = cross_uw[ii]*(w[jj]*dot_uw - u[jj]) / (u_norm**2 * (1 - dot_uw**2)**2)
             
         
         
