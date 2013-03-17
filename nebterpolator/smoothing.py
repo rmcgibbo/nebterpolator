@@ -155,7 +155,7 @@ def buttersworth_smooth(signal, width=11, order=3):
     return output[(pad-1): -(pad-1)]
 
 
-def angular_smooth(signal, smoothing_func=filtfit_smooth, **kwargs):
+def angular_smooth(signal, smoothing_func=buttersworth_smooth, **kwargs):
     """Smooth an signal which represents an angle by filtering its
     sine and cosine components separately.
 
