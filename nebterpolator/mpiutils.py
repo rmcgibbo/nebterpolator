@@ -14,6 +14,61 @@ __all__ = ['mpi_root', 'mpi_rank', 'SelectiveExecution']
 # Code
 ##############################################################################
 
+def group(iterable, n_groups):
+    """Group a list into a list of lists
+
+    This function can be used to split up a big list items into a set to be
+    processed by each worker in an MPI scheme.
+
+    Parameters
+    ----------
+    iterable : array_like
+        A list of elements
+    n_groups : int
+        The number of groups you'd like to make
+
+    Returns
+    -------
+    groups : list
+        A list of lists, where each element in `groups` is a list of
+        approximately `len(iterable) / n_groups` elements from `iterable`
+
+    See Also
+    --------
+    interweave : inverse of this operation
+    """
+    return [iterable[i::n_groups] for i in range(n_groups)]
+
+
+def interweave(list_of_arrays):
+    """Interweave a list of numpy arrays into a single array
+
+    This function does the opposite of `group`, taking care to to put the elemets
+    back in the correct place
+
+    Parameters
+    ----------
+    list_of_arrays : list of np.ndarray
+        A list of numpy arrays, formed (perhaps) by splitting a single large
+        array with `group`.
+
+    Returns
+    -------
+    out_array : np.ndarray
+
+    See Also
+    --------
+    group : inverse of this operation
+    """
+
+    first_dimension = sum(len(e) for e in list_of_arrays)
+    output_shape = (first_dimension,) + list_of_arrays[0].shape[1:]
+
+    output = np.empty(output_shape, dtype=list_of_arrays[0].dtype)
+    for i in range(SIZE):
+        output[i::SIZE] = list_of_arrays[i]
+    return output
+
 
 def mpi_rank(comm=None):
     """Get the rank of the curent MPI node

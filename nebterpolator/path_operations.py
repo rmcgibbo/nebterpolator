@@ -13,7 +13,7 @@ from scipy.interpolate import UnivariateSpline
 
 # local imports
 import core
-from mpiutils import mpi_root
+from mpiutils import mpi_root, group, interweave
 from alignment import align_trajectory
 from smoothing import buttersworth_smooth, angular_smooth
 from inversion import least_squares_cartesian
@@ -33,20 +33,6 @@ SIZE = COMM.Get_size()
 ##############################################################################
 # Functions
 ##############################################################################
-
-
-def group(iterable, n_groups):
-    return [iterable[i::n_groups] for i in range(n_groups)]
-
-
-def interweave(list_of_arrays):
-    first_dimension = sum(len(e) for e in list_of_arrays)
-    output_shape = (first_dimension,) + list_of_arrays[0].shape[1:]
-
-    output = np.empty(output_shape, dtype=list_of_arrays[0].dtype)
-    for i in range(SIZE):
-        output[i::SIZE] = list_of_arrays[i]
-    return output
 
 
 def smooth_internal(xyzlist, atom_names, width, **kwargs):
