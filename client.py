@@ -21,14 +21,14 @@ nm_in_angstrom = 0.1
 
 # cutoff period for the internal coordinate smoother. motions with a shorter
 # period than this (higher frequency) will get filtered out
-smoothing_width = 75.0
+smoothing_width = 100.0
 
 # the spline smoothing factor used for the cartesian smoothing step, that
 # runs after the internal coordinates smoother. The point of this is ONLY
 # to correct for "jitters" in the xyz coordinates that are introduced by
 # imperfections in the redundant internal coordinate -> xyz coordinate
 # step, which runs after smoothing in internal coordinates
-xyz_smoothing_strength = 2.0
+xyz_smoothing_strength = 5.0
 
 
 ##############################################################################
@@ -64,9 +64,8 @@ with mpi_root():
     # apply a bit of spline smoothing in cartesian coordinates to
     # correct for jitters
     jitter_free = smooth_cartesian(smoothed,
-                                strength=xyz_smoothing_strength,
-                                weights=1.0/errors)
-
+                                   strength=xyz_smoothing_strength,
+                                   weights=1.0/errors)
     print 'Saving output'
     with XYZFile(output_filename, 'w') as f:
         f.write_trajectory(jitter_free / nm_in_angstrom, atom_names)

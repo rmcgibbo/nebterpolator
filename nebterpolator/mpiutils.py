@@ -7,8 +7,17 @@
 
 import sys
 import inspect
+import numpy as np
+from mpi4py import MPI
 
-__all__ = ['mpi_root', 'mpi_rank', 'SelectiveExecution']
+##############################################################################
+# Globals
+##############################################################################
+
+__all__ = ['mpi_root', 'mpi_rank', 'SelectiveExecution', 'group', 'interweave']
+
+COMM = MPI.COMM_WORLD
+SIZE = COMM.Get_size()
 
 ##############################################################################
 # Code

@@ -80,6 +80,7 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_bonds, s_angles, s_dihedrals = None, None, None
     with mpi_root():
         ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
+        xyzlist *= 18.903
         # get the internal coordinates in each frame
         bonds = core.bonds(xyzlist, ibonds)
         angles = core.angles(xyzlist, iangles)
@@ -123,9 +124,12 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_xyzlist = np.zeros_like(xyzlist_guess)
     errors = np.zeros(len(xyzlist_guess))
     for i, xyz_guess in enumerate(xyzlist_guess):
+        # if i > 0:
+        #     xyz_guess = s_xyzlist[i-1]
         r = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i], iangles,
                                     s_dihedrals[i], idihedrals, xyz_guess)
         s_xyzlist[i], errors[i] = r
+        s_xyzlist[i] /= 18.903
         print 'Rank %2d: (%3d)->xyz: error %f' % (RANK,
                     RANK + i*SIZE, errors[i])
 
@@ -219,11 +223,11 @@ def union_connectivity(xyzlist, atom_names):
     # prefer. The sorting is not strictly necessary, but it seems good
     # form.
 
-    # ibonds = np.array(sorted(set_bonds, key=lambda e: sum(e)))
+    ibonds = np.array(sorted(set_bonds, key=lambda e: sum(e)))
     iangles = np.array(sorted(set_angles, key=lambda e: sum(e)))
     idihedrals = np.array(sorted(set_dihedrals, key=lambda e: sum(e)))
 
     # get ALL of the possible bonds
-    ibonds = np.array(list(itertools.combinations(range(xyzlist.shape[1]), 2)))
+    # ibonds = np.array(list(itertools.combinations(range(xyzlist.shape[1]), 2)))
 
     return ibonds, iangles, idihedrals
