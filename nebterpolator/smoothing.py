@@ -96,15 +96,16 @@ def window_smooth(signal, window_len=11, window='hanning'):
                          "'bartlett', 'blackman'")
 
     # this does a mirroring padding
-    padded = np.r_[signal[window_len-1: 0: -1],
+    padded = np.r_[2*signal[0] - signal[window_len-1: 0: -1],
                    signal,
-                   signal[-1: -window_len: -1]]
+                   2*signal[-1] - signal[-2: -window_len-1: -1]]
 
     if window == 'flat':
         w = np.ones(window_len, 'd')
     else:
         w = getattr(np, window)(window_len)
     output = np.convolve(w / w.sum(), padded, mode='valid')
+    
     return output[(window_len/2):-(window_len/2)]
 
 

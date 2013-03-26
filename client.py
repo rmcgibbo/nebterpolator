@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 ##############################################################################
 # Imports
 ##############################################################################
@@ -5,6 +7,7 @@
 from nebterpolator.mpiutils import mpi_root
 from nebterpolator.io import XYZFile
 from nebterpolator.path_operations import smooth_internal, smooth_cartesian
+import os, sys
 
 #from nebterpolator.alignment import align_trajectory
 #import matplotlib.pyplot as pp
@@ -13,15 +16,15 @@ from nebterpolator.path_operations import smooth_internal, smooth_cartesian
 # Globals
 ##############################################################################
 
-input_filename = 'reaction_015.xyz'
-output_filename = 'reaction_015.out.xyz'
+input_filename = sys.argv[1]
+output_filename = os.path.splitext(sys.argv[1])[0]+"_out.xyz"
 nm_in_angstrom = 0.1
 
 # these two parameters are adjustable, and depend on the length of the traj
 
 # cutoff period for the internal coordinate smoother. motions with a shorter
 # period than this (higher frequency) will get filtered out
-smoothing_width = 100.0
+smoothing_width = float(sys.argv[2])
 
 # the spline smoothing factor used for the cartesian smoothing step, that
 # runs after the internal coordinates smoother. The point of this is ONLY
@@ -29,7 +32,6 @@ smoothing_width = 100.0
 # imperfections in the redundant internal coordinate -> xyz coordinate
 # step, which runs after smoothing in internal coordinates
 xyz_smoothing_strength = 5.0
-
 
 ##############################################################################
 # Script
