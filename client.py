@@ -31,7 +31,7 @@ smoothing_width = float(sys.argv[2])
 # to correct for "jitters" in the xyz coordinates that are introduced by
 # imperfections in the redundant internal coordinate -> xyz coordinate
 # step, which runs after smoothing in internal coordinates
-xyz_smoothing_strength = 5.0
+xyz_smoothing_strength = 0.0
 
 ##############################################################################
 # Script
@@ -60,7 +60,7 @@ with mpi_root():
 # sets of three atoms, a-b-c, that actually get "bonded" during the
 # trajectory, and all of the dihedral angles between sets of 4 atoms,
 # a-b-c-d, that actually get "bonded" during the trajectory.
-smoothed, errors = smooth_internal(xyzlist, atom_names, width=smoothing_width)
+smoothed, errors = smooth_internal(xyzlist, atom_names, width=smoothing_width, bond_width=smoothing_width, angle_width = smoothing_width, dihedral_width = smoothing_width)
 
 with mpi_root():
     # apply a bit of spline smoothing in cartesian coordinates to

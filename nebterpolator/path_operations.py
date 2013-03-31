@@ -60,10 +60,9 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
         Override width just for the angle terms
     dihedral_width : float
         Override width just for the dihedral terms
-    xyzlist_guess : np.ndarray
+    xyzlist_guess : 
         Cartesian coordinates to use as a guess during the
         reconstruction from internal
-
 
     Returns
     -------
@@ -80,7 +79,6 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_bonds, s_angles, s_dihedrals = None, None, None
     with mpi_root():
         ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
-        xyzlist *= 18.903
         # get the internal coordinates in each frame
         bonds = core.bonds(xyzlist, ibonds)
         angles = core.angles(xyzlist, iangles)
@@ -92,10 +90,10 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
         s_dihedrals = np.zeros_like(dihedrals)
         for i in xrange(bonds.shape[1]):
             #s_bonds[:, i] = buttersworth_smooth(bonds[:, i], width=bond_width)
-            s_bonds[:, i] = window_smooth(bonds[:, i], window_len=bond_width)
+            s_bonds[:, i] = window_smooth(bonds[:, i], window_len=bond_width, window='hanning')
         for i in xrange(angles.shape[1]):
             #s_angles[:, i] = buttersworth_smooth(angles[:, i], width=angle_width)
-            s_angles[:, i] = window_smooth(angles[:, i], window_len=angle_width)
+            s_angles[:, i] = window_smooth(angles[:, i], window_len=angle_width, window='hanning')
         # filter the dihedrals with the angular smoother, that filters
         # the sin and cos components separately
         for i in xrange(dihedrals.shape[1]):
@@ -103,7 +101,7 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
             #    smoothing_func=buttersworth_smooth, width=dihedral_width)
             s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
                                                smoothing_func=window_smooth, 
-                                               window_len=dihedral_width)
+                                               window_len=dihedral_width, window='hanning')
 
         # group these into SIZE components, to be scattered
         xyzlist_guess = group(xyzlist_guess, SIZE)
@@ -129,14 +127,29 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_xyzlist = np.zeros_like(xyzlist_guess)
     errors = np.zeros(len(xyzlist_guess))
     for i, xyz_guess in enumerate(xyzlist_guess):
-        # if i > 0:
-        #     xyz_guess = s_xyzlist[i-1]
+        if i > 0:
+            xref = s_xyzlist[i-1]
+        else:
+            xref = None
         r = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i], iangles,
-                                    s_dihedrals[i], idihedrals, xyz_guess)
+                                    s_dihedrals[i], idihedrals, xyz_guess, xref=xref)
         s_xyzlist[i], errors[i] = r
-        s_xyzlist[i] /= 18.903
-        print 'Rank %2d: (%3d)->xyz: error %f' % (RANK,
-                    RANK + i*SIZE, errors[i])
+
+        if i > 0:
+            aligned0 = align_trajectory(np.array([xyzlist[i],xyzlist[i-1]]), 'progressive')
+            aligned1 = align_trajectory(np.array([s_xyzlist[i],s_xyzlist[i-1]]), 'progressive')
+            maxd0 = np.max(np.abs(aligned0[1] - aligned0[0]))
+            maxd1 = np.max(np.abs(aligned1[1] - aligned1[0]))
+            if maxd0 > 1e-5:
+                jit = maxd1 / maxd0
+            else:
+                jit = 0.0
+            jitter = ("\x1b[1;91m%.5f\x1b[0m" % jit) if jit > 5 else "%.5f" % jit
+        else:
+            jitter = 0.0
+
+        print 'Rank %2d: (%3d)->xyz: error %f jitter %s' % (RANK,
+                    RANK + i*SIZE, errors[i], jitter)
 
     # gather the results back on root
     s_xyzlist = COMM.gather(s_xyzlist, root=0)

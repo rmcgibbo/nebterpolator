@@ -69,7 +69,8 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     ----------------
     verbose : bool, default=True
         Display summary statistics from the L-BFGS-B optimizer to stdout
-
+    xref : np.ndarray, shape=[n_atoms, 3]
+        Another set of XYZ coordinates to act as an anchor (in two pass optimization)
 
     Returns
     -------
@@ -87,6 +88,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # different units than the angles and dihedrals.
 
     verbose = kwargs.pop('verbose', False)
+    xref = kwargs.pop('xref', None)
     for key in kwargs.keys():
         print '%s is not a recognized kwarg. ignored' % key
 
@@ -132,6 +134,11 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
         return x
 
+    if xref != None:
+        xrefi = xyz_to_independent_vars(xref)
+    else:
+        xrefi = None
+
     def func(x):
         xyz = independent_vars_to_xyz(x)
 
@@ -141,11 +148,14 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         my_angles = core.angles(xyzlist, iangles).flatten()
         my_dihedrals = core.dihedrals(xyzlist, idihedrals).flatten()
 
-        d1 = my_bonds - bonds
+        d1 = (my_bonds - bonds) * 18.9
         d2 = my_angles - angles
         d3 = my_dihedrals - dihedrals
-
-        error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3))]
+        if xrefi != None:
+            d4 = (x - xrefi).flatten() * 18.9
+            error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3)), d4]
+        else:
+            error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3))]
 
         if verbose:
             print "RMS_ERROR", np.sqrt(np.mean(np.square(error)))
@@ -154,15 +164,22 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     def grad(x):
         xyz = independent_vars_to_xyz(x)
 
-        d_bonds = core.bond_derivs(xyz, ibonds)
+        d_bonds = core.bond_derivs(xyz, ibonds) * 18.9
         d_angles = core.angle_derivs(xyz, iangles)
         d_dihedrals = core.dihedral_derivs(xyz, idihedrals)
-
-        # the derivatives of the internal coordinates wrt the cartesian
-        # this is 2d, with shape equal to n_internal x n_cartesian
-        d_internal = np.vstack([d_bonds.reshape((len(ibonds), -1)),
-                                d_angles.reshape((len(iangles), -1)),
-                                d_dihedrals.reshape((len(idihedrals), -1))])
+        if xrefi != None:
+            # the derivatives of the internal coordinates wrt the cartesian
+            # this is 2d, with shape equal to n_internal x n_cartesian
+            d_internal = np.vstack([d_bonds.reshape((len(ibonds), -1)),
+                                    d_angles.reshape((len(iangles), -1)),
+                                    d_dihedrals.reshape((len(idihedrals), -1)),
+                                    np.eye(len(x)) * 18.9])
+        else:
+            # the derivatives of the internal coordinates wrt the cartesian
+            # this is 2d, with shape equal to n_internal x n_cartesian
+            d_internal = np.vstack([d_bonds.reshape((len(ibonds), -1)),
+                                    d_angles.reshape((len(iangles), -1)),
+                                    d_dihedrals.reshape((len(idihedrals), -1))])
         return d_internal
 
     x0 = xyz_to_independent_vars(xyz_guess)
