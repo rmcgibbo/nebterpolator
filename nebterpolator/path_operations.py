@@ -127,30 +127,41 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_xyzlist = np.zeros_like(xyzlist_guess)
     errors = np.zeros(len(xyzlist_guess))
     for i, xyz_guess in enumerate(xyzlist_guess):
-        if i > 0:
-            xref = s_xyzlist[i-1]
-        else:
-            xref = None
-        r = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i], iangles,
-                                    s_dihedrals[i], idihedrals, xyz_guess, xref=xref)
-        s_xyzlist[i], errors[i] = r
-
-        if i > 0:
-            aligned0 = align_trajectory(np.array([xyzlist[i],xyzlist[i-1]]), 'progressive')
-            aligned1 = align_trajectory(np.array([s_xyzlist[i],s_xyzlist[i-1]]), 'progressive')
-            maxd0 = np.max(np.abs(aligned0[1] - aligned0[0]))
-            maxd1 = np.max(np.abs(aligned1[1] - aligned1[0]))
-            if maxd0 > 1e-5:
-                jit = maxd1 / maxd0
+        passed = False
+        w_xref = 0.0
+        while not passed:
+            passed = False
+            if i > 0:
+                xref = s_xyzlist[i-1]
+            else:
+                xref = None
+                passed = True
+            r = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i], iangles,
+                                        s_dihedrals[i], idihedrals, xyz_guess, xref=xref, w_xref=w_xref)
+            s_xyzlist[i], errors[i] = r
+    
+            if i > 0:
+                aligned0 = align_trajectory(np.array([xyzlist[i],xyzlist[i-1]]), 0)
+                aligned1 = align_trajectory(np.array([s_xyzlist[i],s_xyzlist[i-1]]), 0)
+                maxd0 = np.max(np.abs(aligned0[1] - aligned0[0]))
+                maxd1 = np.max(np.abs(aligned1[1] - aligned1[0]))
+                if maxd0 > 1e-5:
+                    jit = maxd1 / maxd0
+                else:
+                    jit = 0.0
             else:
                 jit = 0.0
-            jitter = ("\x1b[1;91m%.5f\x1b[0m" % jit) if jit > 5 else "%.5f" % jit
-        else:
-            jitter = 0.0
-
-        print 'Rank %2d: (%3d)->xyz: error %f jitter %s' % (RANK,
-                    RANK + i*SIZE, errors[i], jitter)
-
+            if (not passed) and jit < 2.0:
+                passed = True
+            elif not passed:
+                if w_xref == 0.0:
+                    w_xref += 0.01
+                else:
+                    w_xref *= 1.5
+                print "jitter %f, trying anchor = %f\r" % (jit, w_xref),
+    
+        print 'Rank %2d: (%3d)->xyz: error %f jitter %s' % (RANK, RANK + i*SIZE, errors[i], jit)
+    
     # gather the results back on root
     s_xyzlist = COMM.gather(s_xyzlist, root=0)
     errors = COMM.gather(errors, root=0)
@@ -198,8 +209,9 @@ def smooth_cartesian(xyzlist, strength=None, weights=None):
     for i in range(n_atoms):
         for j in range(n_dims):
             y = aligned[:, i, j]
-            smoothed[:, i, j] = UnivariateSpline(x=t, y=y,
-                                    s=strength, w=weights)(t)
+            #smoothed[:, i, j] = UnivariateSpline(x=t, y=y,
+            #                        s=strength, w=weights)(t)
+            smoothed[:, i, j] = window_smooth(aligned[:, i, j], window_len=int(strength)*2+1, window='flat')
 
     return align_trajectory(smoothed, which='progressive')
 

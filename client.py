@@ -31,7 +31,7 @@ smoothing_width = float(sys.argv[2])
 # to correct for "jitters" in the xyz coordinates that are introduced by
 # imperfections in the redundant internal coordinate -> xyz coordinate
 # step, which runs after smoothing in internal coordinates
-xyz_smoothing_strength = 0.0
+xyz_smoothing_strength = 1.0
 
 ##############################################################################
 # Script

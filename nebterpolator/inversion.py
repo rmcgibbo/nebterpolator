@@ -70,7 +70,9 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     verbose : bool, default=True
         Display summary statistics from the L-BFGS-B optimizer to stdout
     xref : np.ndarray, shape=[n_atoms, 3]
-        Another set of XYZ coordinates to act as an anchor (in two pass optimization)
+        Another set of XYZ coordinates to act as an anchor
+    w_xref : float
+        The weight of the anchor coordinates
 
     Returns
     -------
@@ -89,6 +91,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
     verbose = kwargs.pop('verbose', False)
     xref = kwargs.pop('xref', None)
+    w_xref = kwargs.pop('w_xref', 1.0)
     for key in kwargs.keys():
         print '%s is not a recognized kwarg. ignored' % key
 
@@ -152,7 +155,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         d2 = my_angles - angles
         d3 = my_dihedrals - dihedrals
         if xrefi != None:
-            d4 = (x - xrefi).flatten() * 18.9
+            d4 = (x - xrefi).flatten() * 18.9 * w_xref
             error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3)), d4]
         else:
             error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3))]
@@ -173,7 +176,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
             d_internal = np.vstack([d_bonds.reshape((len(ibonds), -1)),
                                     d_angles.reshape((len(iangles), -1)),
                                     d_dihedrals.reshape((len(idihedrals), -1)),
-                                    np.eye(len(x)) * 18.9])
+                                    np.eye(len(x)) * 18.9 * w_xref])
         else:
             # the derivatives of the internal coordinates wrt the cartesian
             # this is 2d, with shape equal to n_internal x n_cartesian
@@ -187,21 +190,24 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     # the 3N-6 correctly
     np.testing.assert_equal(independent_vars_to_xyz(x0), xyz_guess)
 
-    results = leastsq(func, col_deriv=grad, full_output=True, x0=x0, ftol=1e-5)
-    x, cov_x, info, msg, iflag = results
-
-    rms_error = np.sqrt(np.mean(np.square(info['fvec'])))
-    if verbose:
-        print "RMS_ERROR", rms_error
-
-    xyz_final = independent_vars_to_xyz(x)
-
-    if not iflag in [1, 2, 3, 4]:
-        # these are the sucess values if the flag
-        # raise Exception(msg)
-        print 'WARNING', msg
-
-    return xyz_final, rms_error
+    try:
+        results = leastsq(func, col_deriv=grad, full_output=True, x0=x0, ftol=1e-5)
+        x, cov_x, info, msg, iflag = results
+    
+        rms_error = np.sqrt(np.mean(np.square(info['fvec'])))
+        if verbose:
+            print "RMS_ERROR", rms_error
+    
+        xyz_final = independent_vars_to_xyz(x)
+    
+        if not iflag in [1, 2, 3, 4]:
+            # these are the sucess values if the flag
+            # raise Exception(msg)
+            print 'WARNING', msg
+    
+        return xyz_final, rms_error
+    except:
+        return xyz_guess, 1e10
 
 
 def main():
