@@ -28,11 +28,11 @@ __all__ = ['bond_connectivity', 'angle_connectivity', 'dihedral_connectivity']
 ##############################################################################
 
 
-def bond_connectivity(xyz, atom_names):
+def bond_connectivity(xyz, atom_names, enhance=1.3):
     """Get a list of all the bonds in a conformation
 
     Regular bonds are assigned to all pairs of atoms where
-    the interatomic distance is less than or equal to 1.3 times the
+    the interatomic distance is less than or equal to 'enhance' times the
     sum of their respective covalent radii.
 
     Parameters
@@ -87,8 +87,8 @@ def bond_connectivity(xyz, atom_names):
             # the interatomic distance is less than or equal to 1.3 times the
             # sum of their respective covalent radii.
             d = distance_mtx[i, j]
-            if d < 1.3 * (COVALENT_RADII[proper_atom_names[i]] +
-                          COVALENT_RADII[proper_atom_names[j]]):
+            if d < enhance * (COVALENT_RADII[proper_atom_names[i]] +
+                              COVALENT_RADII[proper_atom_names[j]]):
                 connectivity.append((i, j))
 
     return np.array(connectivity)

@@ -17,7 +17,11 @@ import os, sys
 ##############################################################################
 
 input_filename = sys.argv[1]
-output_filename = os.path.splitext(sys.argv[1])[0]+"_out.xyz"
+if len(sys.argv) > 3:
+    output_filename = sys.argv[3]
+else:
+    output_filename = os.path.splitext(sys.argv[1])[0]+"_out.xyz"
+    print "Supplying default output filename", output_filename
 nm_in_angstrom = 0.1
 
 # these two parameters are adjustable, and depend on the length of the traj
@@ -32,6 +36,9 @@ smoothing_width = float(sys.argv[2])
 # imperfections in the redundant internal coordinate -> xyz coordinate
 # step, which runs after smoothing in internal coordinates
 xyz_smoothing_strength = 1.0
+FinalSmooth = True
+if not FinalSmooth:
+    xyz_smoothing_strength = 0.0
 
 ##############################################################################
 # Script
@@ -44,6 +51,9 @@ with mpi_root():
         xyzlist, atom_names = f.read_trajectory()
         # angstroms to nm
         xyzlist *= nm_in_angstrom
+    if xyzlist.shape[1] < 4:
+        print "Interpolator cannot handle less than four atoms."
+        sys.exit()
 
 # transform into redundant internal coordinates, apply a fourier based
 # smoothing, and then transform back to cartesian.
@@ -62,12 +72,17 @@ with mpi_root():
 # a-b-c-d, that actually get "bonded" during the trajectory.
 smoothed, errors = smooth_internal(xyzlist, atom_names, width=smoothing_width, bond_width=smoothing_width, angle_width = smoothing_width, dihedral_width = smoothing_width)
 
+
 with mpi_root():
+    print 'Saving output to', output_filename
     # apply a bit of spline smoothing in cartesian coordinates to
     # correct for jitters
     jitter_free = smooth_cartesian(smoothed,
                                    strength=xyz_smoothing_strength,
                                    weights=1.0/errors)
-    print 'Saving output'
     with XYZFile(output_filename, 'w') as f:
         f.write_trajectory(jitter_free / nm_in_angstrom, atom_names)
+    # else:
+    #     with XYZFile(output_filename, 'w') as f:
+    #         f.write_trajectory(smoothed / nm_in_angstrom, atom_names)
+        

@@ -126,8 +126,11 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     # compute the inversion for each frame
     s_xyzlist = np.zeros_like(xyzlist_guess)
     errors = np.zeros(len(xyzlist_guess))
+    # Thresholds for error and jitter
+    thre_jit = 1.5
     for i, xyz_guess in enumerate(xyzlist_guess):
         passed = False
+        corrected = False
         w_xref = 0.0
         while not passed:
             passed = False
@@ -151,16 +154,20 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
                     jit = 0.0
             else:
                 jit = 0.0
-            if (not passed) and jit < 2.0:
+            if (not passed) and jit < thre_jit:
                 passed = True
             elif not passed:
                 if w_xref == 0.0:
-                    w_xref += 0.01
+                    w_xref += 2.0**14 / 3.0**13
                 else:
-                    w_xref *= 1.5
+                    w_xref += min(w_xref*0.5, 1.0)
                 print "jitter %f, trying anchor = %f\r" % (jit, w_xref),
-    
-        print 'Rank %2d: (%3d)->xyz: error %f jitter %s' % (RANK, RANK + i*SIZE, errors[i], jit)
+                corrected = True
+        # Print out a message if we had to correct it.
+        if corrected:
+            print '\rRank %2d: (%3d)->xyz: error %f max(dx) %f jitter %s anchor %f' % (RANK, RANK + i*SIZE, errors[i], maxd1, jit, w_xref)
+        if (i%10) == 0:
+            print "\rWorking on frame %i / %i" % (i, len(xyzlist_guess)),
     
     # gather the results back on root
     s_xyzlist = COMM.gather(s_xyzlist, root=0)
@@ -250,6 +257,22 @@ def union_connectivity(xyzlist, atom_names):
         set_angles.update(set([tuple(e) for e in angles]))
         set_dihedrals.update(set([tuple(e) for e in dihedrals]))
 
+    # Try to make sure we have at least one angle and one dihedral in the system.
+
+    enhance = 1.3
+    while (len(set_angles) == 0):
+        longbonds = core.bond_connectivity(xyz, atom_names, enhance=enhance)
+        angles = core.angle_connectivity(longbonds)
+        set_angles.update(set([tuple(e) for e in angles]))
+        enhance += 0.05
+
+    enhance = 1.3
+    while (len(set_dihedrals) == 0):
+        longbonds = core.bond_connectivity(xyz, atom_names, enhance=enhance)
+        dihedrals = core.dihedral_connectivity(longbonds)
+        set_dihedrals.update(set([tuple(e) for e in dihedrals]))
+        enhance += 0.05
+
     # sort the sets and convert them to the numpy arrays that we
     # prefer. The sorting is not strictly necessary, but it seems good
     # form.
@@ -259,6 +282,6 @@ def union_connectivity(xyzlist, atom_names):
     idihedrals = np.array(sorted(set_dihedrals, key=lambda e: sum(e)))
 
     # get ALL of the possible bonds
-    # ibonds = np.array(list(itertools.combinations(range(xyzlist.shape[1]), 2)))
+    ibonds = np.array(list(itertools.combinations(range(xyzlist.shape[1]), 2)))
 
     return ibonds, iangles, idihedrals

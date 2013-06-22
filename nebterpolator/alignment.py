@@ -61,6 +61,11 @@ def kabsch(query, target, operator=True):
     u, s, v = np.linalg.svd(A)
 
     #d = np.diag([1, 1, np.sign(np.linalg.det(A))])
+    #print v.shape
+
+    # LPW: I encountered some mirror-imaging if this line was not included.
+    if np.sign(np.linalg.det(A)) == -1:
+        v[2] *= -1.0
 
     rmsd = np.sqrt(np.abs(error_0 - (2.0 * np.sum(s))) / n_atoms)
 
