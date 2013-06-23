@@ -127,7 +127,7 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     s_xyzlist = np.zeros_like(xyzlist_guess)
     errors = np.zeros(len(xyzlist_guess))
     # Thresholds for error and jitter
-    thre_jit = 1.5
+    thre_jit = 3.0
     for i, xyz_guess in enumerate(xyzlist_guess):
         passed = False
         corrected = False
@@ -158,9 +158,12 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
                 passed = True
             elif not passed:
                 if w_xref == 0.0:
-                    w_xref += 2.0**14 / 3.0**13
+                    w_xref += 2.0**10 / 3.0**10
                 else:
-                    w_xref += min(w_xref*0.5, 1.0)
+                    if w_xref >= 0.99:
+                        w_xref += 1.0
+                    else:
+                        w_xref *= 1.5
                 print "jitter %f, trying anchor = %f\r" % (jit, w_xref),
                 corrected = True
         # Print out a message if we had to correct it.

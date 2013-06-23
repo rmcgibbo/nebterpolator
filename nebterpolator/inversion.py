@@ -150,10 +150,17 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         my_bonds = core.bonds(xyzlist, ibonds).flatten()
         my_angles = core.angles(xyzlist, iangles).flatten()
         my_dihedrals = core.dihedrals(xyzlist, idihedrals).flatten()
-
-        d1 = (my_bonds - bonds) * 18.9
+        
+        d1 = 18.9*(my_bonds - bonds)
+        # Here's a hack to keep the bonds from becoming too short.
+        # print "\r %.4f %.4f" % (np.max(d1), np.max((my_bonds - bonds) / np.sqrt(my_bonds*bonds))),
+        d1 += 10.0*(my_bonds - bonds) / np.sqrt(my_bonds*bonds)
         d2 = my_angles - angles
         d3 = my_dihedrals - dihedrals
+        # d1 /= d1.shape[0]
+        # d2 /= d2.shape[0]
+        # d3 /= d3.shape[0]
+        # print max(d1), max((my_bonds - bonds) ** 2 / (my_bonds * bonds))
         if xrefi != None:
             d4 = (x - xrefi).flatten() * 18.9 * w_xref
             error = np.r_[d1, d2, np.arctan2(np.sin(d3), np.cos(d3)), d4]
@@ -166,6 +173,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
 
     def grad(x):
         xyz = independent_vars_to_xyz(x)
+        print "calling gradient"
 
         d_bonds = core.bond_derivs(xyz, ibonds) * 18.9
         d_angles = core.angle_derivs(xyz, iangles)
