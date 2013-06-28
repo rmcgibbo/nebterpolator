@@ -128,10 +128,11 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
     errors = np.zeros(len(xyzlist_guess))
     # Thresholds for error and jitter
     thre_jit = 3.0
+    w_xrefs = 0.0
     for i, xyz_guess in enumerate(xyzlist_guess):
+        w_xref = 0.0
         passed = False
         corrected = False
-        w_xref = 0.0
         while not passed:
             passed = False
             if i > 0:
@@ -156,9 +157,18 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
                 jit = 0.0
             if (not passed) and jit < thre_jit:
                 passed = True
+                if w_xref >= 1.99:
+                    w_xrefs = w_xref - 1.0
+                elif w_xref < 0.1:
+                    w_xrefs = 0.0
+                else:
+                    w_xrefs = w_xref / 1.5
             elif not passed:
                 if w_xref == 0.0:
-                    w_xref += 2.0**10 / 3.0**10
+                    if w_xrefs > 0.0:
+                        w_xref = w_xrefs
+                    else:
+                        w_xref = 2.0**10 / 3.0**10
                 else:
                     if w_xref >= 0.99:
                         w_xref += 1.0
