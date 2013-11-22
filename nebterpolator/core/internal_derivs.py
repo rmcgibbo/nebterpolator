@@ -214,7 +214,7 @@ def dihedral_derivs(xyz, idihedrals):
         term1 = np.cross(u, w) / (u_norm * (1 - np.dot(u, w)**2))
         term2 = np.cross(v, w) / (v_norm * (1 - np.dot(v, w)**2))
         term3 = np.cross(u, w) * np.dot(u, w) / (w_norm * (1 - np.dot(u, w)**2))
-        term4 = np.cross(v, w) * -np.dot(v, w) / (w_norm * (1 - np.dot(v, w)**2))
+        term4 = np.cross(v, w) * np.dot(v, w) / (w_norm * (1 - np.dot(v, w)**2))
 
         derivatives[d, m, :] = term1
         derivatives[d, n, :] = -term2
