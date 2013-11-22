@@ -145,7 +145,7 @@ def dihedral_hessian(xyz, idihedrals):
     
     jacobian = np.zeros((n_dihedrals, n_atoms, 3))
     hessian = np.zeros((n_dihedrals, n_atoms, 3, n_atoms, 3))
-    
+
     for d, (m, o, p, n) in enumerate(idihedrals):
         u_prime = (xyz[m] - xyz[o])
         v_prime = (xyz[n] - xyz[p])
@@ -179,41 +179,43 @@ def dihedral_hessian(xyz, idihedrals):
         # END JACOBIAN
         
         term1 = sym_outer(cross_uw, w*cos_u - u) / (u_norm**2 * sin4_u)
-        term2 = sym_outer(cross_vw, w*cos_v - v) / (v_norm**2 * sin4_v)
+
+        # The plus sign here in w*cos_v + v is correct, the 2002 paper is wrong.
+        term2 = sym_outer(cross_vw, w*cos_v + v) / (v_norm**2 * sin4_v)
 
         term3 = sym_outer(cross_uw, w - 2*u*cos_u + w*cos_u**2) / (
                     2 * u_norm * w_norm * sin4_u)
+
         term4 = sym_outer(cross_vw, w + 2*v*cos_v + w*cos_v**2) / (
                     2 * v_norm * w_norm * sin4_v)
+
         term5 = sym_outer(cross_uw, u + u*cos_u**2 - 3*w*cos_u + w*cos_u**3) / (
                     2 * w_norm**2 * sin4_u)
         term6 = sym_outer(cross_vw, v + v*cos_v**2 + 3*w*cos_v - w*cos_v**3) / (
                     2 * w_norm**2 * sin4_v)    
-        term7 = (w*cos_u - u) / (u_norm * w_norm * np.sqrt(1-cos_u**2))
-        term8 = (w*cos_v - v) / (v_norm * w_norm * np.sqrt(1-cos_v**2))
+
+        term7 = (-w*cos_u + u) / (u_norm * w_norm * (1-cos_u**2))
+        term8 = (-w*cos_v - v) / (v_norm * w_norm * (1-cos_v**2))
         
-        for a in [m, n, o, p]:
-            for b in [m, n, o, p]:
+        for a in [m, o, p, n]:
+            for b in [m, o, p, n]:
                 hessian[d,a,:,b,:] += sign6(a,m,o, b,m,o) * term1
                 hessian[d,a,:,b,:] += sign6(a,n,p, b,n,p) * term2
                 hessian[d,a,:,b,:] += (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m)) * term3
                 hessian[d,a,:,b,:] += (sign6(a,n,p, b,p,o) + sign6(a,p,o, b,n,p)) * term4
                 hessian[d,a,:,b,:] += sign6(a,o,p, b,p,o) * term5
                 hessian[d,a,:,b,:] += sign6(a,o,p, b,o,p) * term6
-                
-                
-                if a != b:
-                    _term7 = (sign6(a,m,o, b,o,p) + sign6(a,p,o, b,o,m))*term7
-                    _term8 = (sign6(a,n,o, b,o,p) + sign6(a,p,o, b,o,m))*term8
-            
-                    for i in range(3):
-                        for j in range(3):
-                            for k in range(3):
-                                hessian[d, a, i, b, j] += (j-i)*(-1.0/2.0)*np.abs(j-i) * (_term7[k] + _term8[k])
-
-                        
-        return jacobian, hessian
-        
+                if (a, b) not in [(o,m), (p,m), (n,m), (p,o), (n,o), (n,p)]: continue
+                _term7 = sign6(a,p,o, b,o,m)*term7
+                _term8 = sign6(a,n,p, b,p,o)*term8
+                for i in range(3):
+                    for j in range(3):
+                        for k in range(3):
+                            if i != j and i != k and j != k:
+                                hessian[d, a, i, b, j] += (j-i)*(-1.0/2.0)**np.abs(j-i)*(_term7[k] + _term8[k])
+                                hessian[d, b, j, a, i] += (j-i)*(-1.0/2.0)**np.abs(j-i)*(_term7[k] + _term8[k])
+    return jacobian, hessian
+    
         
 if __name__ == '__main__':
     import internal_derivs

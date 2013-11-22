@@ -18,8 +18,22 @@ from itertools import combinations, ifilter
 # these are covalent radii taken from the crystalographic data in nm
 # Dalton Trans., 2008, 2832-2838, DOI: 10.1039/B801115J
 # http://pubs.rsc.org/en/Content/ArticleLanding/2008/DT/b801115j
-COVALENT_RADII = {'C': 0.0762, 'N': 0.0706, 'O': 0.0661, 'H': 0.031,
-                  'S': 0.105}
+# COVALENT_RADII = {'C': 0.0762, 'N': 0.0706, 'O': 0.0661, 'H': 0.031,
+#                   'S': 0.105}
+
+COVALENT_RADII = {'H': 0.031, 'He': 0.028, 
+                  'Li': 0.128, 'Be': 0.096, 'B': 0.084, 'C': 0.076, 'N': 0.071, 'O': 0.066, 'F': 0.057, 'Ne': 0.058, 
+                  'Na': 0.166, 'Mg': 0.141, 'Al': 0.121, 'Si': 0.111, 'P': 0.107, 'S': 0.105, 'Cl': 0.102, 'Ar': 0.106, 
+                  'K': 0.203, 'Ca': 0.176, 'Sc': 0.170, 'Ti': 0.160, 'V': 0.153, 'Cr': 0.139, 'Mn': 0.161, 'Fe': 0.152, 'Co': 0.150, 
+                  'Ni': 0.124, 'Cu': 0.132, 'Zn': 0.122, 'Ga': 0.122, 'Ge': 0.120, 'As': 0.119, 'Se': 0.120, 'Br': 0.120, 'Kr': 0.116, 
+                  'Rb': 0.220, 'Sr': 0.195, 'Y': 0.190, 'Zr': 0.175, 'Nb': 0.164, 'Mo': 0.154, 'Tc': 0.147, 'Ru': 0.146, 'Rh': 0.142, 
+                  'Pd': 0.139, 'Ag': 0.145, 'Cd': 0.144, 'In': 0.142, 'Sn': 0.139, 'Sb': 0.139, 'Te': 0.138, 'I': 0.139, 'Xe': 0.140, 
+                  'Cs': 0.244, 'Ba': 0.215, 'La': 0.207, 'Ce': 0.204, 'Pr': 0.203, 'Nd': 0.201, 'Pm': 0.199, 'Sm': 0.198, 
+                  'Eu': 0.198, 'Gd': 0.196, 'Tb': 0.194, 'Dy': 0.192, 'Ho': 0.192, 'Er': 0.189, 'Tm': 0.190, 'Yb': 0.187, 
+                  'Lu': 0.187, 'Hf': 0.175, 'Ta': 0.170, 'W': 0.162, 'Re': 0.151, 'Os': 0.144, 'Ir': 0.141, 'Pt': 0.136, 
+                  'Au': 0.136, 'Hg': 0.132, 'Tl': 0.145, 'Pb': 0.146, 'Bi': 0.148, 'Po': 0.140, 'At': 0.150, 'Rn': 0.150, 
+                  'Fr': 0.260, 'Ra': 0.221, 'Ac': 0.215, 'Th': 0.206, 'Pa': 0.200, 'U': 0.196, 'Np': 0.190, 'Pu': 0.187, 
+                  'Am': 0.180, 'Cm': 0.169}
 
 __all__ = ['bond_connectivity', 'angle_connectivity', 'dihedral_connectivity']
 
@@ -157,6 +171,8 @@ def dihedral_connectivity(ibonds):
         for b in graph.neighbors(a):
             for c in ifilter(lambda c: c not in [a, b], graph.neighbors(b)):
                 for d in ifilter(lambda d: d not in [a, b, c], graph.neighbors(c)):
-                    idihedrals.append((a, b, c, d))
+                    quadruplet = (a, b, c, d) if a < d else (d, c, b, a)
+                    if quadruplet not in idihedrals:
+                        idihedrals.append(quadruplet)
 
     return np.array(idihedrals)
