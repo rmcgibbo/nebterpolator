@@ -122,7 +122,7 @@ def angles(xyzlist, iangles):
     return np.arccos(dot / (norm1 * norm2))
 
 
-def dihedrals(xyzlist, idihedrals):
+def dihedrals(xyzlist, idihedrals, anchor=None):
     """Calculate a set of bond lengths, for each frame in a trajectory
 
     Parameters
@@ -134,6 +134,8 @@ def dihedrals(xyzlist, idihedrals):
         Each row in `idihedrals` is a quartet of indicies `i`, `j`, `k`, `l`,
         indicating that atoms `i` - `j` - `k` - `l` form a dihedral of
         interest.
+    anchor (optional) : np.ndarray, shape=[n_frames, n_dihedrals]
+        Ensures that the dihedral angles being returned are within 2*pi of the anchor values.
 
     Returns
     -------
@@ -176,7 +178,19 @@ def dihedrals(xyzlist, idihedrals):
         np.sqrt(np.sum(vec2**2, axis=2))
     arg2 = np.sum(np.multiply(cross1, cross2), axis=2)
 
-    return np.arctan2(arg1, arg2)
+    answer = np.arctan2(arg1, arg2)
+
+    if anchor != None:
+        if anchor.shape != answer.shape:
+            raise TypeError('anchor must have same shape as answer')
+        for i in range(anchor.shape[0]):
+            for j in range(anchor.shape[1]):
+                if answer[i, j] - anchor[i, j] > np.pi:
+                    answer[i, j] -= 2*np.pi
+                elif answer[i, j] - anchor[i, j] < -np.pi:
+                    answer[i, j] += 2*np.pi
+
+    return answer
 
 
 def main():
