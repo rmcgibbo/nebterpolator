@@ -27,10 +27,7 @@ Pipeline
 - For each frame, find a set of xyz coordinates that are optimally consistent
   with the smoothed internal coordinates.
    - This is a computationally intensive optimization problem, even with
-     analytic derivatives and Levenberg-Marquardt. Fortunately it's embarrassingly
-     parallel over the frames in the trajectory, as each frame is optimized
-     separately. The code is currently running this step across multiple nodes
-     with MPI.
+     analytic derivatives and Levenberg-Marquardt. 
 - Apply a very slight smoothing in the cartesian coordinate space, to correct
   for jitters in the trajectory caused by imperfections in the internal -> xyz
   optimization. This obviously is done after RMSD alignment.
@@ -47,7 +44,6 @@ tasks, besides trajectory smoothing.
   respect to cartesian coordinates.
 - Find a set of cartesian coordinates given redundant internal coordinates
   as input, via a least-squares optimization (Levenberg-Marquardt).
-- Context managers that make MPI code in python much more elegant.
 - Kabsch RMSD in numpy.
 
 Requirements
@@ -55,17 +51,14 @@ Requirements
 - python 2.6+  (tested with 2.7.3)
 - numpy, 1.6+  (tested with 1.6.2)
 - scipy, 0.10+ (tested with 0.10.1)
-- mpi4py 1.3+  (tested with 1.3)
 
 Getting Started
 ---------------
 
-Open up the file `client.py` and take a look. Try running it, either serially
-or with mpi
+Open up the file `client.py` and take a look. 
 
 ```
 $ python client.py
-$ mpirun -np 2 client.py
 ```
 
 License

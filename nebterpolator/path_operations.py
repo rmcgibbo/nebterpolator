@@ -8,12 +8,10 @@
 # library imports
 import numpy as np
 import itertools
-from mpi4py import MPI
 from scipy.interpolate import UnivariateSpline
 
 # local imports
 import core
-from mpiutils import mpi_root, group, interweave
 from alignment import align_trajectory
 from smoothing import buttersworth_smooth, angular_smooth, window_smooth
 from inversion import least_squares_cartesian
@@ -24,10 +22,6 @@ from inversion import least_squares_cartesian
 
 __all__ = ['smooth_internal', 'smooth_cartesian', 'union_connectivity']
 DEBUG = True
-
-COMM = MPI.COMM_WORLD
-RANK = COMM.Get_rank()
-SIZE = COMM.Get_size()
 
 
 ##############################################################################
@@ -77,51 +71,30 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
 
     ibonds, iangles, idihedrals = None, None, None
     s_bonds, s_angles, s_dihedrals = None, None, None
-    with mpi_root():
-        ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
-        # get the internal coordinates in each frame
-        bonds = core.bonds(xyzlist, ibonds)
-        angles = core.angles(xyzlist, iangles)
-        dihedrals = core.dihedrals(xyzlist, idihedrals)
+    ibonds, iangles, idihedrals = union_connectivity(xyzlist, atom_names)
+    # get the internal coordinates in each frame
+    bonds = core.bonds(xyzlist, ibonds)
+    angles = core.angles(xyzlist, iangles)
+    dihedrals = core.dihedrals(xyzlist, idihedrals)
 
-        # run the smoothing
-        s_bonds = np.zeros_like(bonds)
-        s_angles = np.zeros_like(angles)
-        s_dihedrals = np.zeros_like(dihedrals)
-        for i in xrange(bonds.shape[1]):
-            #s_bonds[:, i] = buttersworth_smooth(bonds[:, i], width=bond_width)
-            s_bonds[:, i] = window_smooth(bonds[:, i], window_len=bond_width, window='hanning')
-        for i in xrange(angles.shape[1]):
-            #s_angles[:, i] = buttersworth_smooth(angles[:, i], width=angle_width)
-            s_angles[:, i] = window_smooth(angles[:, i], window_len=angle_width, window='hanning')
-        # filter the dihedrals with the angular smoother, that filters
-        # the sin and cos components separately
-        for i in xrange(dihedrals.shape[1]):
-            #s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
-            #    smoothing_func=buttersworth_smooth, width=dihedral_width)
-            s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
-                                               smoothing_func=window_smooth, 
-                                               window_len=dihedral_width, window='hanning')
-
-        # group these into SIZE components, to be scattered
-        xyzlist_guess = group(xyzlist_guess, SIZE)
-        s_bonds = group(s_bonds, SIZE)
-        s_angles = group(s_angles, SIZE)
-        s_dihedrals = group(s_dihedrals, SIZE)
-
-    if RANK != 0:
-        xyzlist_guess = None
-
-    # scatter these
-    xyzlist_guess = COMM.scatter(xyzlist_guess, root=0)
-    s_bonds = COMM.scatter(s_bonds, root=0)
-    s_angles = COMM.scatter(s_angles, root=0)
-    s_dihedrals = COMM.scatter(s_dihedrals, root=0)
-
-    # broadcast the indices to every node
-    ibonds = COMM.bcast(ibonds, root=0)
-    iangles = COMM.bcast(iangles, root=0)
-    idihedrals = COMM.bcast(idihedrals, root=0)
+    # run the smoothing
+    s_bonds = np.zeros_like(bonds)
+    s_angles = np.zeros_like(angles)
+    s_dihedrals = np.zeros_like(dihedrals)
+    for i in xrange(bonds.shape[1]):
+        #s_bonds[:, i] = buttersworth_smooth(bonds[:, i], width=bond_width)
+        s_bonds[:, i] = window_smooth(bonds[:, i], window_len=bond_width, window='hanning')
+    for i in xrange(angles.shape[1]):
+        #s_angles[:, i] = buttersworth_smooth(angles[:, i], width=angle_width)
+        s_angles[:, i] = window_smooth(angles[:, i], window_len=angle_width, window='hanning')
+    # filter the dihedrals with the angular smoother, that filters
+    # the sin and cos components separately
+    for i in xrange(dihedrals.shape[1]):
+        #s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
+        #    smoothing_func=buttersworth_smooth, width=dihedral_width)
+        s_dihedrals[:, i] = angular_smooth(dihedrals[:, i],
+                                           smoothing_func=window_smooth, 
+                                           window_len=dihedral_width, window='hanning')
 
     # compute the inversion for each frame
     s_xyzlist = np.zeros_like(xyzlist_guess)
@@ -178,18 +151,12 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
                 corrected = True
         # Print out a message if we had to correct it.
         if corrected:
-            print '\rRank %2d: (%3d)->xyz: error %f max(dx) %f jitter %s anchor %f' % (RANK, RANK + i*SIZE, errors[i], maxd1, jit, w_xref)
+            print '\rxyz: error %f max(dx) %f jitter %s anchor %f' % (errors[i], maxd1, jit, w_xref)
         if (i%10) == 0:
             print "\rWorking on frame %i / %i" % (i, len(xyzlist_guess)),
-    
-    # gather the results back on root
-    s_xyzlist = COMM.gather(s_xyzlist, root=0)
-    errors = COMM.gather(errors, root=0)
 
-    return_value = (None, None)
-    with mpi_root():
-        # interleave the results back together
-        return_value = (interweave(s_xyzlist), interweave(errors))
+    #return_value = (interweave(s_xyzlist), interweave(errors))
+    return_value = s_xyzlist, errors
 
     return return_value
 
