@@ -9,12 +9,8 @@
 import numpy as np
 import sys
 from scipy.optimize import leastsq, fmin, fmin_l_bfgs_b
-try:
-    from nanoreactor.molecule import Molecule
-    from nanoreactor.morse_function import PairwiseMorse
-    have_molecule = 1
-except:
-    have_molecule = 0
+from molecule import Molecule
+from morse_function import PairwiseMorse
 
 # local imports
 import core
@@ -97,7 +93,7 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
     """
 
     if not have_molecule:
-        raise ImportError('The least_squares_cartesian function requires the nanoreactor.molecule module')
+        raise ImportError('The least_squares_cartesian function requires the molecule module')
 
     # TODO: expose the ability to set a weight vector over the different
     # internal coordinates that sets how they contribute to the objective
