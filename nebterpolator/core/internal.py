@@ -181,13 +181,13 @@ def dihedrals(xyzlist, idihedrals, anchor=None):
     answer = np.arctan2(arg1, arg2)
 
     if anchor != None:
-        if anchor.shape != answer.shape:
-            raise TypeError('anchor must have same shape as answer')
-        for i in range(anchor.shape[0]):
-            for j in range(anchor.shape[1]):
-                if answer[i, j] - anchor[i, j] > np.pi:
+        if anchor.shape != answer[0].shape:
+            raise TypeError('anchor must have same shape as first element of answer')
+        for i in range(answer.shape[0]):
+            for j in range(answer.shape[1]):
+                if answer[i, j] - anchor[j] > np.pi:
                     answer[i, j] -= 2*np.pi
-                elif answer[i, j] - anchor[i, j] < -np.pi:
+                elif answer[i, j] - anchor[j] < -np.pi:
                     answer[i, j] += 2*np.pi
 
     return answer

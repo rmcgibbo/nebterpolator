@@ -29,7 +29,7 @@ DEBUG = True
 ##############################################################################
 
 
-def smooth_internal(xyzlist, atom_names, width, **kwargs):
+def smooth_internal(xyzlist, atom_names, width, w_morse=0.0, **kwargs):
     """Smooth a trajectory by transforming to redundant, internal coordinates,
     running a 1d timeseries smoothing algorithm on each DOF, and then
     reconstructing a set of consistent cartesian coordinates.
@@ -45,6 +45,8 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
         The names of the atoms. Required for determing connectivity.
     width : float
         Width for the smoothing kernels
+    w_morse: float
+        Weight of the Morse potential in the smoothing
 
     Other Parameters
     ----------------
@@ -114,7 +116,8 @@ def smooth_internal(xyzlist, atom_names, width, **kwargs):
                 xref = None
                 passed = True
             r = least_squares_cartesian(s_bonds[i], ibonds, s_angles[i], iangles,
-                                        s_dihedrals[i], idihedrals, xyz_guess, xref=xref, w_xref=w_xref)
+                                        s_dihedrals[i], idihedrals, xyz_guess, xref=xref, w_xref=w_xref, 
+                                        elem=atom_names, w_morse=(0 if i in [0, len(xyzlist_guess) - 1] else w_morse))
             s_xyzlist[i], errors[i] = r
     
             if i > 0:
