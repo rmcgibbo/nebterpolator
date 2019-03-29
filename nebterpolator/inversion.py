@@ -92,8 +92,8 @@ def least_squares_cartesian(bonds, ibonds, angles, iangles, dihedrals,
         The RMS deviation across internal DOFs
     """
 
-    if not have_molecule:
-        raise ImportError('The least_squares_cartesian function requires the molecule module')
+    #if not have_molecule:
+        #raise ImportError('The least_squares_cartesian function requires the molecule module')
 
     # TODO: expose the ability to set a weight vector over the different
     # internal coordinates that sets how they contribute to the objective
