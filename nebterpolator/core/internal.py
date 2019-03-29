@@ -180,7 +180,7 @@ def dihedrals(xyzlist, idihedrals, anchor=None):
 
     answer = np.arctan2(arg1, arg2)
 
-    if anchor != None:
+    if anchor is not None:
         if anchor.shape != answer[0].shape:
             raise TypeError('anchor must have same shape as first element of answer')
         for i in range(answer.shape[0]):
